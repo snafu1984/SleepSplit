@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sleepsplit"
+version = "0.1.0"
+description = "Split long MP3 audiobooks into bedtime-friendly listening segments."
+readme = "README.md"
+requires-python = ">=3.13"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sleepsplit"]
