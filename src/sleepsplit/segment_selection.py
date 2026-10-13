@@ -6,8 +6,8 @@ MAX_DURATION = 420
 
 
 def select_cut_point(
-    pause_positions: list[int],
-) -> int | None:
+    pause_positions: list[int | float],
+) -> int | float | None:
     """Select the pause closest to the target duration.
 
     Only pauses within the allowed duration range are considered.

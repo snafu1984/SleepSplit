@@ -23,3 +23,7 @@ def test_accepts_minimum_duration() -> None:
 
 def test_accepts_maximum_duration() -> None:
     assert select_cut_point([420]) == 420
+
+
+def test_selects_pause_with_decimal_seconds() -> None:
+    assert select_cut_point([275.5, 301.25, 338.75]) == 301.25
