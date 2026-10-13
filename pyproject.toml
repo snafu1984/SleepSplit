@@ -11,3 +11,6 @@ requires-python = ">=3.13"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sleepsplit"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.11"]
