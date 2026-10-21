@@ -137,7 +137,7 @@ def test_strips_whitespace_from_album_name(
     assert get_album_name(tmp_path / "kapitel.mp3") == "Mein Hörbuch"
 
 
-def test_raises_error_when_album_tag_is_missing(
+def test_returns_empty_string_when_album_tag_is_missing(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -154,11 +154,10 @@ def test_raises_error_when_album_tag_is_missing(
         fake_run,
     )
 
-    with pytest.raises(AudioMetadataError, match="album tag"):
-        get_album_name(tmp_path / "kapitel.mp3")
+    assert get_album_name(tmp_path / "kapitel.mp3") == ""
 
 
-def test_raises_error_when_album_tag_is_only_whitespace(
+def test_returns_empty_string_when_album_tag_is_only_whitespace(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -175,5 +174,4 @@ def test_raises_error_when_album_tag_is_only_whitespace(
         fake_run,
     )
 
-    with pytest.raises(AudioMetadataError, match="album tag"):
-        get_album_name(tmp_path / "kapitel.mp3")
+    assert get_album_name(tmp_path / "kapitel.mp3") == ""

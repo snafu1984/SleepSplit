@@ -88,15 +88,6 @@ def test_album_name_can_be_used_to_plan_output_paths(
 import pytest
 
 
-def test_rejects_empty_album_name() -> None:
-    with pytest.raises(ValueError, match="album_name must not be empty"):
-        plan_output_paths(
-            source_file=Path("/audiobooks/Kapitel_01.mp3"),
-            album_name=" ",
-            segment_count=2,
-        )
-
-
 def test_rejects_zero_segments() -> None:
     with pytest.raises(ValueError, match="segment_count must be at least 1"):
         plan_output_paths(
@@ -125,3 +116,18 @@ def test_rejects_album_name_with_directory_separator() -> None:
             album_name="../Anderes Album",
             segment_count=2,
         )
+
+
+def test_places_output_files_in_cut_directory_when_album_is_empty() -> None:
+    source = Path("/audiobooks/Kapitel_01.mp3")
+
+    output_paths = plan_output_paths(
+        source_file=source,
+        album_name="",
+        segment_count=2,
+    )
+
+    assert output_paths == [
+        Path("/audiobooks/cut/Kapitel_01_001.mp3"),
+        Path("/audiobooks/cut/Kapitel_01_002.mp3"),
+    ]

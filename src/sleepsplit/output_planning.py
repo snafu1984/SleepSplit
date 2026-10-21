@@ -15,10 +15,10 @@ def plan_output_paths(
         raise ValueError("source_file must be an MP3 file")
 
     album_name = album_name.strip()
-    if not album_name:
-        raise ValueError("album_name must not be empty")
 
-    if album_name in {".", ".."} or "/" in album_name or "\\" in album_name:
+    if album_name and (
+        album_name in {".", ".."} or "/" in album_name or "\\" in album_name
+    ):
         raise ValueError("album_name must be a single directory name")
 
     if not isinstance(segment_count, int) or isinstance(segment_count, bool):
@@ -27,7 +27,7 @@ def plan_output_paths(
     if segment_count < 1:
         raise ValueError("segment_count must be at least 1")
 
-    output_dir = source_path.parent / album_name
+    output_dir = source_path.parent / (album_name or "cut")
     source_stem = source_path.stem
 
     return [

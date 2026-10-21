@@ -97,9 +97,4 @@ def get_album_name(audio_file: str | Path) -> str:
             message += f" Details: {details}"
         raise AudioMetadataError(message) from error
 
-    album_name = result.stdout.strip()
-
-    if not album_name:
-        raise AudioMetadataError("The album tag is missing or empty.")
-
-    return album_name
+    return result.stdout.strip()
