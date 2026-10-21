@@ -31,3 +31,51 @@ def test_returns_none_when_no_suitable_pause_exists(
     )
 
     assert find_next_cut_point(tmp_path / "audiobook.mp3", 300.0) is None
+
+
+from sleepsplit.analysis import find_cut_points
+
+
+def test_finds_multiple_cut_points_from_one_analysis(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls = 0
+
+    def fake_detect_silence(
+        audio_file: str | Path,
+    ) -> list[tuple[float, float]]:
+        nonlocal calls
+        calls += 1
+        return [
+            (290.0, 294.0),
+            (394.0, 398.0),
+            (598.0, 602.0),
+        ]
+
+    monkeypatch.setattr(
+        "sleepsplit.analysis.detect_silence",
+        fake_detect_silence,
+    )
+
+    cut_points = find_cut_points(tmp_path / "audiobook.mp3")
+
+    assert cut_points == [292.0, 600.0]
+    assert calls == 1
+
+
+def test_returns_empty_list_when_no_suitable_pause_exists(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def fake_detect_silence(
+        audio_file: str | Path,
+    ) -> list[tuple[float, float]]:
+        return [(10.0, 20.0), (100.0, 110.0)]
+
+    monkeypatch.setattr(
+        "sleepsplit.analysis.detect_silence",
+        fake_detect_silence,
+    )
+
+    assert find_cut_points(tmp_path / "audiobook.mp3") == []
