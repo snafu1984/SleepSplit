@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from sleepsplit.analysis import find_next_cut_point
+from sleepsplit.analysis import (
+    find_cut_points,
+    find_next_cut_point,
+    plan_cut_points,
+)
 
 
 def test_returns_absolute_cut_point(
@@ -31,9 +35,6 @@ def test_returns_none_when_no_suitable_pause_exists(
     )
 
     assert find_next_cut_point(tmp_path / "audiobook.mp3", 300.0) is None
-
-
-from sleepsplit.analysis import find_cut_points
 
 
 def test_finds_multiple_cut_points_from_one_analysis(
@@ -79,3 +80,45 @@ def test_returns_empty_list_when_no_suitable_pause_exists(
     )
 
     assert find_cut_points(tmp_path / "audiobook.mp3") == []
+
+
+def test_plans_cuts_without_creating_a_short_final_segment() -> None:
+    pauses = [
+        (290.0, 294.0),
+        (394.0, 398.0),
+        (598.0, 602.0),
+    ]
+
+    cut_points = plan_cut_points(pauses, audio_duration=722.0)
+
+    assert cut_points == [396.0]
+
+
+def test_keeps_a_normal_final_segment() -> None:
+    pauses = [
+        (290.0, 294.0),
+        (598.0, 602.0),
+    ]
+
+    cut_points = plan_cut_points(pauses, audio_duration=900.0)
+
+    assert cut_points == [292.0, 600.0]
+
+
+def test_returns_no_cuts_when_audio_fits_in_one_segment() -> None:
+    pauses = [(290.0, 294.0)]
+
+    cut_points = plan_cut_points(pauses, audio_duration=350.0)
+
+    assert cut_points == []
+
+
+def test_returns_empty_list_when_no_complete_plan_is_possible() -> None:
+    pauses = [
+        (290.0, 294.0),
+        (890.0, 894.0),
+    ]
+
+    cut_points = plan_cut_points(pauses, audio_duration=1000.0)
+
+    assert cut_points == []
