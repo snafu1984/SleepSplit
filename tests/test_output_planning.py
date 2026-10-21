@@ -104,3 +104,24 @@ def test_rejects_zero_segments() -> None:
             album_name="Mein Album",
             segment_count=0,
         )
+
+
+def test_rejects_source_file_without_mp3_extension() -> None:
+    with pytest.raises(ValueError, match="source_file must be an MP3 file"):
+        plan_output_paths(
+            source_file=Path("/audiobooks/Kapitel_01.wav"),
+            album_name="Mein Album",
+            segment_count=2,
+        )
+
+
+def test_rejects_album_name_with_directory_separator() -> None:
+    with pytest.raises(
+        ValueError,
+        match="album_name must be a single directory name",
+    ):
+        plan_output_paths(
+            source_file=Path("/audiobooks/Kapitel_01.mp3"),
+            album_name="../Anderes Album",
+            segment_count=2,
+        )
