@@ -1,3 +1,5 @@
+"""Tests for the audiobook splitting pipeline."""
+
 from pathlib import Path
 
 import pytest
@@ -18,7 +20,7 @@ def test_does_nothing_when_no_cut_points_are_found(
     )
     monkeypatch.setattr(
         "sleepsplit.pipeline.get_album_name",
-        lambda audio_file: "Test Album",
+        lambda audio_file: "Test_Album_cut",
     )
     monkeypatch.setattr(
         "sleepsplit.pipeline.detect_silence",
@@ -57,7 +59,7 @@ def test_splits_audiobook_using_planned_cut_points(
     )
     monkeypatch.setattr(
         "sleepsplit.pipeline.get_album_name",
-        lambda audio_file: "Test Album",
+        lambda audio_file: "Test_Album",
     )
     monkeypatch.setattr(
         "sleepsplit.pipeline.detect_silence",
@@ -77,11 +79,11 @@ def test_splits_audiobook_using_planned_cut_points(
     assert calls["source"] == source_file
     assert calls["cuts"] == [292.0, 592.0]
     assert calls["outputs"] == [
-        tmp_path / "Test Album" / "audiobook_001.mp3",
-        tmp_path / "Test Album" / "audiobook_002.mp3",
-        tmp_path / "Test Album" / "audiobook_003.mp3",
+        tmp_path / "Test_Album_cut" / "audiobook_001.mp3",
+        tmp_path / "Test_Album_cut" / "audiobook_002.mp3",
+        tmp_path / "Test_Album_cut" / "audiobook_003.mp3",
     ]
-    assert not (tmp_path / "Test Album").exists()
+    assert not (tmp_path / "Test_Album_cut").exists()
 
 
 def test_does_not_split_when_output_file_already_exists(
@@ -91,7 +93,7 @@ def test_does_not_split_when_output_file_already_exists(
     source_file = tmp_path / "audiobook.mp3"
     source_file.touch()
 
-    output_dir = tmp_path / "Test Album"
+    output_dir = tmp_path / "Test_Album_cut"
     output_dir.mkdir()
     existing_output = output_dir / "audiobook_001.mp3"
     existing_output.touch()
@@ -102,7 +104,7 @@ def test_does_not_split_when_output_file_already_exists(
     )
     monkeypatch.setattr(
         "sleepsplit.pipeline.get_album_name",
-        lambda audio_file: "Test Album",
+        lambda audio_file: "Test_Album",
     )
     monkeypatch.setattr(
         "sleepsplit.pipeline.detect_silence",

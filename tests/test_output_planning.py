@@ -3,6 +3,8 @@
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from sleepsplit.audio_metadata import get_album_name
 from sleepsplit.output_planning import plan_output_paths
 
@@ -17,9 +19,9 @@ def test_creates_numbered_paths_in_album_directory() -> None:
     )
 
     assert output_paths == [
-        Path("/audiobooks/Mein Album/Kapitel_01_001.mp3"),
-        Path("/audiobooks/Mein Album/Kapitel_01_002.mp3"),
-        Path("/audiobooks/Mein Album/Kapitel_01_003.mp3"),
+        Path("/audiobooks/Mein Album_cut/Kapitel_01_001.mp3"),
+        Path("/audiobooks/Mein Album_cut/Kapitel_01_002.mp3"),
+        Path("/audiobooks/Mein Album_cut/Kapitel_01_003.mp3"),
     ]
 
 
@@ -33,8 +35,8 @@ def test_starts_numbering_at_one_for_each_source_file() -> None:
     )
 
     assert output_paths == [
-        Path("/audiobooks/Mein Album/Kapitel_02_001.mp3"),
-        Path("/audiobooks/Mein Album/Kapitel_02_002.mp3"),
+        Path("/audiobooks/Mein Album_cut/Kapitel_02_001.mp3"),
+        Path("/audiobooks/Mein Album_cut/Kapitel_02_002.mp3"),
     ]
 
 
@@ -48,7 +50,7 @@ def test_supports_a_source_filename_without_spaces_or_extra_suffixes() -> None:
     )
 
     assert output_paths == [
-        Path("/audiobooks/Hörbuch/Track_001.mp3"),
+        Path("/audiobooks/Hörbuch_cut/Track_001.mp3"),
     ]
 
 
@@ -79,13 +81,10 @@ def test_album_name_can_be_used_to_plan_output_paths(
     )
 
     assert output_paths == [
-        tmp_path / "Mein Hörbuch" / "Kapitel_01_001.mp3",
-        tmp_path / "Mein Hörbuch" / "Kapitel_01_002.mp3",
+        tmp_path / "Mein Hörbuch_cut" / "Kapitel_01_001.mp3",
+        tmp_path / "Mein Hörbuch_cut" / "Kapitel_01_002.mp3",
     ]
-    assert not (tmp_path / "Mein Hörbuch").exists()
-
-
-import pytest
+    assert not (tmp_path / "Mein Hörbuch_cut").exists()
 
 
 def test_rejects_zero_segments() -> None:

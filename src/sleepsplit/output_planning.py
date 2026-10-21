@@ -27,7 +27,7 @@ def plan_output_paths(
     if segment_count < 1:
         raise ValueError("segment_count must be at least 1")
 
-    output_dir = source_path.parent / (album_name or "cut")
+    output_dir = source_path.parent / (f"{album_name}_cut" if album_name else "cut")
     source_stem = source_path.stem
 
     return [
