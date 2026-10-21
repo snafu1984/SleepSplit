@@ -53,11 +53,12 @@ def plan_cut_points(
     pauses: list[tuple[float, float]],
     audio_duration: float,
 ) -> list[float]:
-    """Plan cut points while avoiding unnecessarily short segments.
+    """Plan cut points, allowing a short final segment if necessary.
 
-    The planner prefers segments close to the target duration.
-    Every segment must be within the allowed duration range,
-    unless the complete audio fits into one segment.
+    First searches for a plan where every segment is within the
+    allowed duration range. If no such plan exists, chooses a plan
+    whose non-final segments are valid and whose final segment is
+    as close as possible to the allowed range.
 
     Args:
         pauses: Absolute silence intervals as (start, end) pairs.
@@ -66,7 +67,6 @@ def plan_cut_points(
     Returns:
         Absolute cut positions in ascending order.
     """
-
     candidates = sorted(
         {
             (start + end) / 2
@@ -78,8 +78,7 @@ def plan_cut_points(
     if audio_duration <= MAX_DURATION:
         return []
 
-    # Dynamic programming: find a complete path from the start
-    # of the file to its end using valid segment durations.
+    # Each entry stores the lowest cost and cut sequence reaching a pause.
     best: dict[float, tuple[float, list[float]]] = {0.0: (0.0, [])}
 
     for candidate in candidates:
@@ -102,18 +101,37 @@ def plan_cut_points(
                 [*previous_cuts, candidate],
             )
 
+    # Prefer a fully valid plan, including the final segment.
     complete_paths = [
         (cost, cuts)
         for position, (cost, cuts) in best.items()
         if MIN_DURATION <= audio_duration - position <= MAX_DURATION
     ]
 
-    if not complete_paths:
+    if complete_paths:
+        _, selected_cuts = min(
+            complete_paths,
+            key=lambda item: (item[0], len(item[1])),
+        )
+        return selected_cuts
+
+    # Fallback: retain only cuts that can be reached through valid
+    # preceding segments. The final segment may be shorter or longer
+    # than the preferred range, but intermediate segments stay valid.
+    fallback_paths = [
+        (cost, cuts, position) for position, (cost, cuts) in best.items() if cuts
+    ]
+
+    if not fallback_paths:
         return []
 
-    _, selected_cuts = min(
-        complete_paths,
-        key=lambda item: (item[0], len(item[1])),
+    _, selected_cuts, _ = min(
+        fallback_paths,
+        key=lambda item: (
+            abs(audio_duration - item[2] - TARGET_DURATION),
+            item[0],
+            -item[2],
+        ),
     )
 
     return selected_cuts

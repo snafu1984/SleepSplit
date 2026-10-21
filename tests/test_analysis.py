@@ -113,7 +113,7 @@ def test_returns_no_cuts_when_audio_fits_in_one_segment() -> None:
     assert cut_points == []
 
 
-def test_returns_empty_list_when_no_complete_plan_is_possible() -> None:
+def test_fallback_avoids_an_overlong_intermediate_segment() -> None:
     pauses = [
         (290.0, 294.0),
         (890.0, 894.0),
@@ -121,4 +121,46 @@ def test_returns_empty_list_when_no_complete_plan_is_possible() -> None:
 
     cut_points = plan_cut_points(pauses, audio_duration=1000.0)
 
-    assert cut_points == []
+    assert cut_points == [292.0]
+
+
+def test_uses_available_pause_when_no_fully_valid_plan_exists() -> None:
+    pauses = [(290.0, 294.0)]
+
+    cut_points = plan_cut_points(pauses, audio_duration=600.0)
+
+    assert cut_points == [292.0]
+
+
+def test_allows_short_final_segment_after_valid_segments() -> None:
+    pauses = [
+        (290.0, 294.0),
+        (690.0, 694.0),
+    ]
+
+    cut_points = plan_cut_points(pauses, audio_duration=800.0)
+
+    assert cut_points == [292.0, 692.0]
+
+
+def test_fallback_does_not_create_an_overlong_middle_segment() -> None:
+    pauses = [
+        (290.0, 294.0),
+        (890.0, 894.0),
+    ]
+
+    cut_points = plan_cut_points(pauses, audio_duration=1000.0)
+
+    assert cut_points == [292.0]
+
+
+def test_fallback_keeps_valid_segments_before_short_final_segment() -> None:
+    pauses = [
+        (290.0, 294.0),
+        (394.0, 398.0),
+        (598.0, 602.0),
+    ]
+
+    cut_points = plan_cut_points(pauses, audio_duration=722.0)
+
+    assert cut_points == [396.0]
