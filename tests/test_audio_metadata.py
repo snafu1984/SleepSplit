@@ -7,6 +7,7 @@ import pytest
 
 from sleepsplit.audio_metadata import (
     AudioMetadataError,
+    get_album_name,
     get_audio_duration,
 )
 
@@ -93,3 +94,86 @@ def test_raises_error_for_invalid_duration(
 
     with pytest.raises(AudioMetadataError, match="invalid audio duration"):
         get_audio_duration(tmp_path / "audiobook.mp3")
+
+
+def test_returns_album_name(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def fake_run(command, **kwargs):
+        assert "format_tags=album" in command
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=0,
+            stdout="Mein Hörbuch\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "sleepsplit.audio_metadata.subprocess.run",
+        fake_run,
+    )
+
+    assert get_album_name(tmp_path / "kapitel.mp3") == "Mein Hörbuch"
+
+
+def test_strips_whitespace_from_album_name(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=0,
+            stdout="  Mein Hörbuch  \n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "sleepsplit.audio_metadata.subprocess.run",
+        fake_run,
+    )
+
+    assert get_album_name(tmp_path / "kapitel.mp3") == "Mein Hörbuch"
+
+
+def test_raises_error_when_album_tag_is_missing(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "sleepsplit.audio_metadata.subprocess.run",
+        fake_run,
+    )
+
+    with pytest.raises(AudioMetadataError, match="album tag"):
+        get_album_name(tmp_path / "kapitel.mp3")
+
+
+def test_raises_error_when_album_tag_is_only_whitespace(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=0,
+            stdout="   \n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "sleepsplit.audio_metadata.subprocess.run",
+        fake_run,
+    )
+
+    with pytest.raises(AudioMetadataError, match="album tag"):
+        get_album_name(tmp_path / "kapitel.mp3")
