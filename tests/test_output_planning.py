@@ -83,3 +83,24 @@ def test_album_name_can_be_used_to_plan_output_paths(
         tmp_path / "Mein Hörbuch" / "Kapitel_01_002.mp3",
     ]
     assert not (tmp_path / "Mein Hörbuch").exists()
+
+
+import pytest
+
+
+def test_rejects_empty_album_name() -> None:
+    with pytest.raises(ValueError, match="album_name must not be empty"):
+        plan_output_paths(
+            source_file=Path("/audiobooks/Kapitel_01.mp3"),
+            album_name=" ",
+            segment_count=2,
+        )
+
+
+def test_rejects_zero_segments() -> None:
+    with pytest.raises(ValueError, match="segment_count must be at least 1"):
+        plan_output_paths(
+            source_file=Path("/audiobooks/Kapitel_01.mp3"),
+            album_name="Mein Album",
+            segment_count=0,
+        )
