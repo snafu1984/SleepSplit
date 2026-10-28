@@ -123,3 +123,40 @@ def test_does_not_split_when_output_file_already_exists(
         pipeline.split_audiobook(source_file)
 
     assert existing_output.is_file()
+
+
+@pytest.mark.parametrize(
+    "duration",
+    [float("nan"), float("inf"), float("-inf")],
+)
+def test_rejects_non_finite_audio_duration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    duration: float,
+) -> None:
+    source_file = tmp_path / "audiobook.mp3"
+    source_file.touch()
+
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_audio_duration",
+        lambda audio_file: duration,
+    )
+
+    def unexpected_call(*args, **kwargs):
+        pytest.fail("Processing must stop for a non-finite duration.")
+
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.detect_silence",
+        unexpected_call,
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.plan_output_paths",
+        unexpected_call,
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.split_audio",
+        unexpected_call,
+    )
+
+    with pytest.raises(ValueError, match="duration"):
+        pipeline.split_audiobook(source_file)

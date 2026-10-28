@@ -1,5 +1,6 @@
 """Coordinate the audiobook splitting workflow."""
 
+import math
 from pathlib import Path
 
 from sleepsplit.analysis import plan_cut_points
@@ -26,8 +27,8 @@ def split_audiobook(source_file: str | Path) -> None:
     """
     duration = get_audio_duration(source_file)
 
-    if duration <= 0:
-        return
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError("Audio duration must be finite and greater than zero.")
 
     pauses = detect_silence(source_file)
     cut_points = plan_cut_points(pauses, audio_duration=duration)
