@@ -106,3 +106,81 @@ def test_reports_missing_ffmpeg(
 
     with pytest.raises(SilenceDetectionError, match="FFmpeg"):
         detect_silence(tmp_path / "audiobook.mp3")
+
+
+@pytest.mark.parametrize(
+    "minimum_silence_duration",
+    [0, -1, float("nan"), float("inf"), float("-inf")],
+)
+def test_rejects_invalid_minimum_silence_duration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    minimum_silence_duration: float,
+) -> None:
+    """Reject invalid silence durations before calling FFmpeg."""
+
+    def unexpected_run(
+        command: list[str],
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        pytest.fail("FFmpeg must not run with an invalid silence duration")
+
+    monkeypatch.setattr("sleepsplit.ffmpeg_analysis.subprocess.run", unexpected_run)
+
+    with pytest.raises(ValueError, match="minimum_silence_duration"):
+        detect_silence(
+            tmp_path / "audiobook.mp3",
+            minimum_silence_duration=minimum_silence_duration,
+        )
+
+
+@pytest.mark.parametrize(
+    "noise_threshold",
+    ["", "   ", "invalid", "40dB", "--40dB"],
+)
+def test_rejects_invalid_noise_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    noise_threshold: str,
+) -> None:
+    """Reject malformed noise thresholds before calling FFmpeg."""
+
+    def unexpected_run(
+        command: list[str],
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        pytest.fail("FFmpeg must not run with an invalid noise threshold")
+
+    monkeypatch.setattr("sleepsplit.ffmpeg_analysis.subprocess.run", unexpected_run)
+
+    with pytest.raises(ValueError, match="noise_threshold"):
+        detect_silence(
+            tmp_path / "audiobook.mp3",
+            noise_threshold=noise_threshold,
+        )
+
+
+@pytest.mark.parametrize("noise_threshold", ["-40dB", "-35dB", "0.01", "0"])
+def test_accepts_valid_noise_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    noise_threshold: str,
+) -> None:
+    """Accept common FFmpeg noise threshold formats."""
+
+    def fake_run(
+        command: list[str],
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        assert f"silencedetect=noise={noise_threshold}:d=0.5" in command
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("sleepsplit.ffmpeg_analysis.subprocess.run", fake_run)
+
+    assert (
+        detect_silence(
+            tmp_path / "audiobook.mp3",
+            noise_threshold=noise_threshold,
+        )
+        == []
+    )

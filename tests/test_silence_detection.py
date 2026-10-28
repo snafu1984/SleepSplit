@@ -58,3 +58,22 @@ def test_ignores_negative_start_time() -> None:
     """
 
     assert parse_silence_output(output) == []
+
+
+def test_uses_latest_start_when_another_start_appears_before_end() -> None:
+    output = """
+    silence_start: 2.0
+    silence_start: 5.0
+    silence_end: 8.0 | silence_duration: 3.0
+    """
+
+    assert parse_silence_output(output) == [(5.0, 8.0)]
+
+
+def test_ignores_overflowing_timestamps() -> None:
+    output = """
+    silence_start: 1e999
+    silence_end: 1e1000 | silence_duration: 1e1000
+    """
+
+    assert parse_silence_output(output) == []
