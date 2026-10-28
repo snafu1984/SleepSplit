@@ -40,3 +40,12 @@ def test_accepts_pause_at_maximum_duration_boundary() -> None:
     pauses = [(719.0, 721.0)]  # Mittelpunkt 720, relativ 420 Sekunden
 
     assert select_absolute_cut_point(pauses, segment_start=300.0) == 720.0
+
+
+def test_selects_earlier_pause_when_equally_close() -> None:
+    pauses = [
+        (538.0, 542.0),  # Mittelpunkt 540, relativ 240 Sekunden
+        (658.0, 662.0),  # Mittelpunkt 660, relativ 360 Sekunden
+    ]
+
+    assert select_absolute_cut_point(pauses, segment_start=300.0) == 540.0
