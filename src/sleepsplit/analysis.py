@@ -102,10 +102,14 @@ def plan_cut_points(
             )
 
     # Prefer a fully valid plan, including the final segment.
+    final_min_duration = 120.0
+    final_max_duration = 540.0
+
     complete_paths = [
         (cost, cuts)
         for position, (cost, cuts) in best.items()
-        if MIN_DURATION <= audio_duration - position <= MAX_DURATION
+        if cuts
+        and final_min_duration <= audio_duration - position <= final_max_duration
     ]
 
     if complete_paths:
@@ -115,12 +119,13 @@ def plan_cut_points(
         )
         return selected_cuts
 
-    # Fallback: retain only cuts with valid preceding segments
-    # and a final segment no longer than MAX_DURATION.
+    # Fallback: keep regular segments valid and prefer a final segment
+    # within the allowed final duration range.
     fallback_paths = [
         (cost, cuts, position)
         for position, (cost, cuts) in best.items()
-        if cuts and audio_duration - position <= MAX_DURATION
+        if cuts
+        and final_min_duration <= audio_duration - position <= final_max_duration
     ]
 
     if not fallback_paths:

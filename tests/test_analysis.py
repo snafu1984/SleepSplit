@@ -91,7 +91,7 @@ def test_plans_cuts_without_creating_a_short_final_segment() -> None:
 
     cut_points = plan_cut_points(pauses, audio_duration=722.0)
 
-    assert cut_points == [396.0]
+    assert cut_points == [292.0]
 
 
 def test_keeps_a_normal_final_segment() -> None:
@@ -133,14 +133,11 @@ def test_uses_available_pause_when_no_fully_valid_plan_exists() -> None:
 
 
 def test_allows_short_final_segment_after_valid_segments() -> None:
-    pauses = [
-        (290.0, 294.0),
-        (690.0, 694.0),
-    ]
+    pauses = [(358.0, 362.0)]
 
-    cut_points = plan_cut_points(pauses, audio_duration=800.0)
+    cut_points = plan_cut_points(pauses, audio_duration=480.0)
 
-    assert cut_points == [292.0, 692.0]
+    assert cut_points == [360.0]
 
 
 def test_fallback_does_not_create_an_overlong_middle_segment() -> None:
@@ -154,7 +151,7 @@ def test_fallback_does_not_create_an_overlong_middle_segment() -> None:
     assert cut_points == []
 
 
-def test_fallback_keeps_valid_segments_before_short_final_segment() -> None:
+def test_prefers_target_duration_when_multiple_valid_plans_exist() -> None:
     pauses = [
         (290.0, 294.0),
         (394.0, 398.0),
@@ -163,12 +160,67 @@ def test_fallback_keeps_valid_segments_before_short_final_segment() -> None:
 
     cut_points = plan_cut_points(pauses, audio_duration=722.0)
 
-    assert cut_points == [396.0]
+    assert cut_points == [292.0]
 
 
 def test_does_not_claim_valid_plan_with_overlong_final_segment() -> None:
     pauses = [(290.0, 294.0)]
 
     cut_points = plan_cut_points(pauses, audio_duration=1000.0)
+
+    assert cut_points == []
+
+
+def test_does_not_split_audio_shorter_than_420_seconds() -> None:
+    assert plan_cut_points([], audio_duration=419.0) == []
+
+
+def test_does_not_split_audio_exactly_420_seconds() -> None:
+    assert (
+        plan_cut_points(
+            [(300.0, 304.0)],
+            audio_duration=420.0,
+        )
+        == []
+    )
+
+
+def test_allows_cut_planning_above_420_seconds() -> None:
+    pauses = [(298.0, 302.0)]
+
+    assert plan_cut_points(pauses, audio_duration=421.0) == [300.0]
+
+
+def test_accepts_final_segment_of_exactly_120_seconds() -> None:
+    pauses = [(358.0, 362.0)]
+
+    assert plan_cut_points(pauses, audio_duration=480.0) == [360.0]
+
+
+def test_accepts_final_segment_of_exactly_540_seconds() -> None:
+    pauses = [(298.0, 302.0)]
+
+    assert plan_cut_points(pauses, audio_duration=840.0) == [300.0]
+
+
+def test_does_not_accept_final_segment_shorter_than_120_seconds() -> None:
+    pauses = [(358.0, 362.0)]
+
+    assert plan_cut_points(pauses, audio_duration=479.0) == []
+
+
+def test_does_not_accept_final_segment_longer_than_540_seconds() -> None:
+    pauses = [(298.0, 302.0)]
+
+    assert plan_cut_points(pauses, audio_duration=841.0) == []
+
+
+def test_does_not_allow_regular_segment_shorter_than_240_seconds() -> None:
+    pauses = [
+        (198.0, 202.0),
+        (438.0, 442.0),
+    ]
+
+    cut_points = plan_cut_points(pauses, audio_duration=660.0)
 
     assert cut_points == []
