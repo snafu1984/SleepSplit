@@ -119,25 +119,4 @@ def plan_cut_points(
         )
         return selected_cuts
 
-    # Fallback: keep regular segments valid and prefer a final segment
-    # within the allowed final duration range.
-    fallback_paths = [
-        (cost, cuts, position)
-        for position, (cost, cuts) in best.items()
-        if cuts
-        and final_min_duration <= audio_duration - position <= final_max_duration
-    ]
-
-    if not fallback_paths:
-        return []
-
-    _, selected_cuts, _ = min(
-        fallback_paths,
-        key=lambda item: (
-            abs(audio_duration - item[2] - TARGET_DURATION),
-            item[0],
-            -item[2],
-        ),
-    )
-
-    return selected_cuts
+    return []
