@@ -1,5 +1,6 @@
 """Coordinate silence detection and cut point selection."""
 
+import math
 from pathlib import Path
 
 from sleepsplit.cut_point_selection import select_absolute_cut_point
@@ -67,6 +68,8 @@ def plan_cut_points(
     Returns:
         Absolute cut positions in ascending order.
     """
+    if not math.isfinite(audio_duration) or audio_duration <= 0:
+        raise ValueError("audio_duration must be finite and greater than zero.")
     candidates = sorted(
         {
             (start + end) / 2

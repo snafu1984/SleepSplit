@@ -213,3 +213,52 @@ def test_does_not_allow_regular_segment_shorter_than_240_seconds() -> None:
     cut_points = plan_cut_points(pauses, audio_duration=660.0)
 
     assert cut_points == []
+
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "audio_duration",
+    [0.0, -1.0, float("nan"), float("inf"), float("-inf")],
+)
+def test_rejects_invalid_audio_duration(
+    audio_duration: float,
+) -> None:
+    with pytest.raises(ValueError, match="audio_duration"):
+        plan_cut_points([], audio_duration=audio_duration)
+
+
+def test_ignores_pause_with_end_after_audio_duration() -> None:
+    pauses = [(298.0, 302.0)]
+
+    assert plan_cut_points(pauses, audio_duration=300.0) == []
+
+
+def test_ignores_pause_with_non_finite_timestamp() -> None:
+    pauses = [
+        (float("nan"), 300.0),
+        (298.0, float("inf")),
+        (298.0, 302.0),
+    ]
+
+    assert plan_cut_points(pauses, audio_duration=600.0) == [300.0]
+
+
+@pytest.mark.parametrize(
+    "pause",
+    [
+        (-1.0, 10.0),
+        (10.0, 10.0),
+        (20.0, 10.0),
+        (float("nan"), 300.0),
+        (300.0, float("inf")),
+        (float("-inf"), 300.0),
+    ],
+)
+def test_ignores_invalid_pause_intervals(
+    pause: tuple[float, float],
+) -> None:
+    pauses = [pause, (298.0, 302.0)]
+
+    assert plan_cut_points(pauses, audio_duration=600.0) == [300.0]
