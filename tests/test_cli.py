@@ -142,3 +142,73 @@ def test_rejects_file_as_directory(
         cli.main()
 
     assert exc_info.value.code == 2
+
+
+def test_dry_run_displays_planned_outputs_without_splitting(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Display the plan without invoking the actual splitting pipeline."""
+    from sleepsplit.models import AudiobookPlan
+
+    source_file = tmp_path / "Book.mp3"
+    source_file.touch()
+
+    output_paths = [
+        tmp_path / "Book_cut" / "Book_001.mp3",
+        tmp_path / "Book_cut" / "Book_002.mp3",
+    ]
+
+    monkeypatch.setattr(
+        cli,
+        "plan_audiobook",
+        lambda source: AudiobookPlan(
+            cut_points=[300.0],
+            output_paths=output_paths,
+        ),
+    )
+
+    def unexpected_split(*args, **kwargs):
+        pytest.fail("Dry-run must not call split_audiobook.")
+
+    monkeypatch.setattr(cli, "split_audiobook", unexpected_split)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["sleepsplit", "--dry-run", str(tmp_path)],
+    )
+
+    assert cli.main() == 0
+
+    output = capsys.readouterr().out
+    assert "DRY RUN" in output
+    assert "Cut 1: 300.00 seconds" in output
+    assert str(output_paths[0]) in output
+    assert str(output_paths[1]) in output
+    assert "Would split: 1" in output
+    assert "Failed: 0" in output
+
+    assert not (tmp_path / "Book_cut").exists()
+    assert source_file.is_file()
+
+
+def test_dry_run_counts_unplannable_file_as_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Count files without a valid plan as skipped during dry-run."""
+    (tmp_path / "Short.mp3").touch()
+
+    monkeypatch.setattr(cli, "plan_audiobook", lambda source: None)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["sleepsplit", "--dry-run", str(tmp_path)],
+    )
+
+    assert cli.main() == 0
+
+    output = capsys.readouterr().out
+    assert "Skipped: 1" in output
+    assert "Would split: 0" in output
+    assert "Failed: 0" in output

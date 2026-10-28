@@ -160,3 +160,96 @@ def test_rejects_non_finite_audio_duration(
 
     with pytest.raises(ValueError, match="duration"):
         pipeline.split_audiobook(source_file)
+
+
+def test_plan_audiobook_returns_cut_points_and_output_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Return the planned cuts and output paths without creating files."""
+    source_file = tmp_path / "audiobook.mp3"
+    source_file.touch()
+
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_audio_duration",
+        lambda audio_file: 900.0,
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_album_name",
+        lambda audio_file: "Test_Album",
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.detect_silence",
+        lambda audio_file: [(290.0, 294.0), (590.0, 594.0)],
+    )
+
+    plan = pipeline.plan_audiobook(source_file)
+
+    assert plan is not None
+    assert plan.cut_points == [292.0, 592.0]
+    assert plan.output_paths == [
+        tmp_path / "Test_Album_cut" / "audiobook_001.mp3",
+        tmp_path / "Test_Album_cut" / "audiobook_002.mp3",
+        tmp_path / "Test_Album_cut" / "audiobook_003.mp3",
+    ]
+    assert list(tmp_path.iterdir()) == [source_file]
+
+
+def test_dry_run_does_not_create_or_modify_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Dry-run plans a split without creating outputs or calling the splitter."""
+    source_file = tmp_path / "audiobook.mp3"
+    original_content = b"original audiobook data"
+    source_file.write_bytes(original_content)
+
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_audio_duration",
+        lambda audio_file: 900.0,
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_album_name",
+        lambda audio_file: "Test_Album",
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.detect_silence",
+        lambda audio_file: [(290.0, 294.0), (590.0, 594.0)],
+    )
+
+    def unexpected_split(*args, **kwargs):
+        pytest.fail("Dry-run must not call the splitter.")
+
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.split_audio",
+        unexpected_split,
+    )
+
+    result = pipeline.split_audiobook(source_file, dry_run=True)
+
+    assert result is pipeline.SplitResult.SPLIT
+    assert source_file.read_bytes() == original_content
+    assert list(tmp_path.iterdir()) == [source_file]
+
+
+def test_dry_run_skips_when_no_cut_points_are_found(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Skip a dry-run when no suitable cuts are available."""
+    source_file = tmp_path / "audiobook.mp3"
+    source_file.touch()
+
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_audio_duration",
+        lambda audio_file: 200.0,
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.detect_silence",
+        lambda audio_file: [],
+    )
+
+    result = pipeline.split_audiobook(source_file, dry_run=True)
+
+    assert result is pipeline.SplitResult.SKIPPED
+    assert list(tmp_path.iterdir()) == [source_file]

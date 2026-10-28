@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from sleepsplit.models import SplitResult
-from sleepsplit.pipeline import split_audiobook
+from sleepsplit.pipeline import plan_audiobook, split_audiobook
 
 
 def main() -> int:
@@ -21,6 +21,11 @@ def main() -> int:
         "directory",
         type=Path,
         help="Directory containing MP3 files to process.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Analyze files and show the planned outputs without modifying files.",
     )
     args = parser.parse_args()
 
@@ -45,6 +50,9 @@ def main() -> int:
         print(f"No MP3 files found in: {directory}")
         return 0
 
+    if args.dry_run:
+        print("DRY RUN: No files will be created or modified.")
+
     split_count = 0
     skipped_count = 0
     failed_count = 0
@@ -53,7 +61,27 @@ def main() -> int:
         print(f"\nProcessing: {source_file.name}")
 
         try:
-            result = split_audiobook(source_file)
+            if args.dry_run:
+                plan = plan_audiobook(source_file)
+
+                if plan is None:
+                    result = SplitResult.SKIPPED
+                else:
+                    result = SplitResult.SPLIT
+                    print(f"  Planned cuts: {len(plan.cut_points)}")
+
+                    for index, cut_point in enumerate(
+                        plan.cut_points,
+                        start=1,
+                    ):
+                        print(f"  Cut {index}: {cut_point:.2f} seconds")
+
+                    print("  Planned output files:")
+                    for output_path in plan.output_paths:
+                        print(f"    {output_path}")
+            else:
+                result = split_audiobook(source_file)
+
         except (OSError, RuntimeError, ValueError) as exc:
             failed_count += 1
             print(
@@ -64,10 +92,13 @@ def main() -> int:
 
         if result is SplitResult.SPLIT:
             split_count += 1
-            print(f"Split successfully: {source_file.name}")
+            message = "Would split" if args.dry_run else "Split successfully"
+            print(f"{message}: {source_file.name}")
+
         elif result is SplitResult.SKIPPED:
             skipped_count += 1
             print(f"Skipped (no suitable cut points): {source_file.name}")
+
         else:
             failed_count += 1
             print(
@@ -75,8 +106,8 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    print("\nSummary")
-    print(f"Split successfully: {split_count}")
+    print("\nDry-run summary" if args.dry_run else "\nSummary")
+    print(f"{'Would split' if args.dry_run else 'Split successfully'}: {split_count}")
     print(f"Skipped: {skipped_count}")
     print(f"Failed: {failed_count}")
     print(f"Total: {len(mp3_files)}")

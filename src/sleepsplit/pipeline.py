@@ -6,7 +6,7 @@ from pathlib import Path
 from sleepsplit.analysis import plan_cut_points
 from sleepsplit.audio_metadata import get_album_name, get_audio_duration
 from sleepsplit.ffmpeg_analysis import detect_silence
-from sleepsplit.models import SplitResult
+from sleepsplit.models import AudiobookPlan, SplitResult
 from sleepsplit.output_planning import plan_output_paths
 from sleepsplit.splitting import split_audio
 
@@ -20,15 +20,13 @@ def _check_output_paths(output_paths: list[Path]) -> None:
         raise FileExistsError(f"Output file(s) already exist: {names}")
 
 
-def split_audiobook(source_file: str | Path) -> SplitResult:
-    """Split an audiobook at suitable pauses.
+def plan_audiobook(source_file: str | Path) -> AudiobookPlan | None:
+    """Analyze an audiobook and plan its cuts and output files.
 
-    Return SPLIT when the audiobook was split successfully.
-    Return SKIPPED when no suitable cut points were found.
-
-    If no suitable cut points are found, leave the source file untouched
-    and do not create output files or directories.
+    Return None when no suitable cut points are found.
+    Do not create or modify any files.
     """
+    source_file = Path(source_file)
     duration = get_audio_duration(source_file)
 
     if not math.isfinite(duration) or duration <= 0:
@@ -38,7 +36,7 @@ def split_audiobook(source_file: str | Path) -> SplitResult:
     cut_points = plan_cut_points(pauses, audio_duration=duration)
 
     if not cut_points:
-        return SplitResult.SKIPPED
+        return None
 
     album_name = get_album_name(source_file)
     output_paths = plan_output_paths(
@@ -47,7 +45,33 @@ def split_audiobook(source_file: str | Path) -> SplitResult:
         segment_count=len(cut_points) + 1,
     )
 
-    _check_output_paths(output_paths)
-    split_audio(source_file, cut_points, output_paths)
+    return AudiobookPlan(
+        cut_points=cut_points,
+        output_paths=output_paths,
+    )
+
+
+def split_audiobook(
+    source_file: str | Path,
+    *,
+    dry_run: bool = False,
+) -> SplitResult:
+    """Split an audiobook, or only plan the split in dry-run mode.
+
+    Return SPLIT when a valid split plan exists.
+    Return SKIPPED when no suitable cut points are found.
+
+    Dry-run mode does not create or modify files.
+    """
+    plan = plan_audiobook(source_file)
+
+    if plan is None:
+        return SplitResult.SKIPPED
+
+    if dry_run:
+        return SplitResult.SPLIT
+
+    _check_output_paths(plan.output_paths)
+    split_audio(source_file, plan.cut_points, plan.output_paths)
 
     return SplitResult.SPLIT
