@@ -8,6 +8,15 @@ from pathlib import Path
 from sleepsplit.time_format import seconds_to_mp3splt_time
 
 
+def _remove_partial_outputs(output_paths: list[Path]) -> None:
+    """Remove output files that may have been partially created."""
+    for path in output_paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def split_audio(
     source_file: str | Path,
     cut_points: list[float],
@@ -80,8 +89,10 @@ def split_audio(
             check=True,
         )
     except FileNotFoundError as error:
+        _remove_partial_outputs(outputs)
         raise RuntimeError("mp3splt was not found. Check your PATH.") from error
     except subprocess.CalledProcessError as error:
+        _remove_partial_outputs(outputs)
         details = (error.stderr or "").strip()
         message = "mp3splt could not split the audio file."
         if details:
@@ -92,6 +103,7 @@ def split_audio(
 
     if missing_outputs:
         missing_names = ", ".join(path.name for path in missing_outputs)
+        _remove_partial_outputs(outputs)
         raise RuntimeError(
             "mp3splt did not create all expected output files. "
             f"Missing: {missing_names}"

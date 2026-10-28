@@ -124,40 +124,41 @@ def test_rejects_existing_output_files(
         )
 
 
-def test_raises_runtime_error_when_mp3splt_fails(
+def test_removes_partial_outputs_when_output_file_is_missing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Raise a helpful error when mp3splt exits unsuccessfully."""
+    """Remove partial output files when mp3splt omits an output file."""
     source = tmp_path / "book.mp3"
     output_dir = tmp_path / "Album"
-    output_dir.mkdir()
     outputs = [
         output_dir / "book_001.mp3",
         output_dir / "book_002.mp3",
     ]
 
-    def failed_run(
+    def incomplete_run(
         command: list[str],
         *,
         capture_output: bool,
         text: bool,
         check: bool,
     ) -> subprocess.CompletedProcess[str]:
-        raise subprocess.CalledProcessError(
-            returncode=1,
-            cmd=command,
-            stderr="Test error from mp3splt",
-        )
+        outputs[0].touch()
+        return subprocess.CompletedProcess(command, 0, "", "")
 
-    monkeypatch.setattr("sleepsplit.splitting.subprocess.run", failed_run)
+    monkeypatch.setattr("sleepsplit.splitting.subprocess.run", incomplete_run)
 
-    with pytest.raises(RuntimeError, match="Test error from mp3splt"):
+    with pytest.raises(
+        RuntimeError,
+        match="did not create all expected output files",
+    ):
         split_audio(
             source_file=source,
             cut_points=[300.0],
             output_paths=outputs,
         )
+
+    assert not any(path.exists() for path in outputs)
 
 
 def test_raises_runtime_error_when_output_file_is_missing(
@@ -315,3 +316,127 @@ def test_rejects_non_finite_cut_points(
             cut_points=[cut_point],
             output_paths=outputs,
         )
+
+
+def test_raises_runtime_error_when_mp3splt_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Raise a helpful error when mp3splt is not available."""
+    source = tmp_path / "book.mp3"
+    output_dir = tmp_path / "Album"
+    outputs = [
+        output_dir / "book_001.mp3",
+        output_dir / "book_002.mp3",
+    ]
+
+    def missing_executable(
+        command: list[str],
+        *,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        raise FileNotFoundError("mp3splt")
+
+    monkeypatch.setattr(
+        "sleepsplit.splitting.subprocess.run",
+        missing_executable,
+    )
+
+    with pytest.raises(RuntimeError, match="mp3splt was not found"):
+        split_audio(
+            source_file=source,
+            cut_points=[300.0],
+            output_paths=outputs,
+        )
+
+
+def test_removes_partial_outputs_when_mp3splt_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Remove partial output files when mp3splt fails."""
+    source = tmp_path / "book.mp3"
+    output_dir = tmp_path / "Album"
+    outputs = [
+        output_dir / "book_001.mp3",
+        output_dir / "book_002.mp3",
+    ]
+
+    def failed_run(
+        command: list[str],
+        *,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        outputs[0].touch()
+        raise subprocess.CalledProcessError(
+            returncode=1,
+            cmd=command,
+            stderr="Test error from mp3splt",
+        )
+
+    monkeypatch.setattr("sleepsplit.splitting.subprocess.run", failed_run)
+
+    with pytest.raises(RuntimeError, match="Test error from mp3splt"):
+        split_audio(
+            source_file=source,
+            cut_points=[300.0],
+            output_paths=outputs,
+        )
+
+    assert not any(path.exists() for path in outputs)
+
+
+def test_preserves_original_error_when_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preserve the mp3splt error if cleanup also fails."""
+    source = tmp_path / "book.mp3"
+    output_dir = tmp_path / "Album"
+    outputs = [
+        output_dir / "book_001.mp3",
+        output_dir / "book_002.mp3",
+    ]
+
+    def failed_run(
+        command: list[str],
+        *,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        outputs[0].touch()
+        raise subprocess.CalledProcessError(
+            returncode=1,
+            cmd=command,
+            stderr="Original mp3splt error",
+        )
+
+    original_unlink = Path.unlink
+
+    def failing_unlink(
+        path: Path,
+        *,
+        missing_ok: bool = False,
+    ) -> None:
+        if path == outputs[0]:
+            raise OSError("Simulated cleanup failure")
+        original_unlink(path, missing_ok=missing_ok)
+
+    monkeypatch.setattr("sleepsplit.splitting.subprocess.run", failed_run)
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+
+    with pytest.raises(RuntimeError, match="Original mp3splt error"):
+        split_audio(
+            source_file=source,
+            cut_points=[300.0],
+            output_paths=outputs,
+        )
+
+    assert outputs[0].exists()
