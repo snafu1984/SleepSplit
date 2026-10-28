@@ -4,6 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from sleepsplit.audio_metadata import get_album_name
+from sleepsplit.disk_assignment import assign_disc_tags
 from sleepsplit.models import SplitResult
 from sleepsplit.pipeline import plan_audiobook, split_audiobook
 
@@ -30,6 +32,12 @@ def _print_summary(
     print(f"{'=' * 50}")
 
 
+def _get_output_dir(source_file: Path) -> Path:
+    """Return the output directory for an audiobook."""
+    album_name = get_album_name(source_file).strip()
+    return source_file.parent / (f"{album_name}_cut" if album_name else "cut")
+
+
 def main() -> int:
     """Run SleepSplit on all MP3 files in one directory."""
     parser = argparse.ArgumentParser(
@@ -52,7 +60,7 @@ def main() -> int:
     parser.add_argument(
         "--disk",
         action="store_true",
-        help="Assign disc numbers to split MP3 files using ID3 TPOS tags.",
+        help="Assign disc numbers to output MP3 files using ID3 TPOS tags.",
     )
     args = parser.parse_args()
 
@@ -84,6 +92,9 @@ def main() -> int:
     skipped_count = 0
     failed_count = 0
 
+    # Only files newly created during this invocation are tagged.
+    outputs_by_dir: dict[Path, set[Path]] = {}
+
     for source_file in mp3_files:
         print(f"\nProcessing: {source_file.name}")
 
@@ -107,7 +118,23 @@ def main() -> int:
                     for output_path in plan.output_paths:
                         print(f"    {output_path}")
             else:
-                result = split_audiobook(source_file, disk=args.disk)
+                output_dir = _get_output_dir(source_file) if args.disk else None
+                existing_outputs = (
+                    set(output_dir.glob("*.mp3"))
+                    if output_dir is not None and output_dir.exists()
+                    else set()
+                )
+
+                result = split_audiobook(source_file)
+
+                if args.disk and output_dir is not None:
+                    current_outputs = (
+                        set(output_dir.glob("*.mp3")) if output_dir.exists() else set()
+                    )
+                    new_outputs = current_outputs - existing_outputs
+
+                    if new_outputs:
+                        outputs_by_dir.setdefault(output_dir, set()).update(new_outputs)
 
         except (OSError, RuntimeError, ValueError) as exc:
             failed_count += 1
@@ -132,6 +159,25 @@ def main() -> int:
                 f"ERROR: Unexpected result for {source_file.name}: {result!r}",
                 file=sys.stderr,
             )
+
+    if args.disk and not args.dry_run:
+        for output_dir, output_paths in sorted(
+            outputs_by_dir.items(),
+            key=lambda item: str(item[0]).casefold(),
+        ):
+            try:
+                ordered_paths = sorted(
+                    output_paths,
+                    key=lambda path: path.name.casefold(),
+                )
+                assign_disc_tags(ordered_paths)
+                print(f"Assigned disc numbers: {output_dir.name}")
+            except (OSError, RuntimeError, ValueError) as exc:
+                failed_count += 1
+                print(
+                    f"ERROR: Disc assignment for {output_dir.name}: {exc}",
+                    file=sys.stderr,
+                )
 
     _print_summary(
         split_count,

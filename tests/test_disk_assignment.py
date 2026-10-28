@@ -17,6 +17,34 @@ def test_groups_segments_into_discs_near_sixty_minutes() -> None:
     assert disc_numbers[12:] == [2] * 12
 
 
+def test_groups_segments_with_different_durations_in_order() -> None:
+    """Group variable-length segments while preserving their order."""
+    durations = [
+        1800.0,  # 30 min
+        1500.0,  # 25 min
+        2100.0,  # 35 min
+        1500.0,  # 25 min
+    ]
+
+    disc_numbers = _plan_disc_groups(durations)
+
+    assert disc_numbers == [1, 1, 2, 2]
+
+
+def test_prefers_disc_durations_closer_to_sixty_minutes() -> None:
+    """Prefer a grouping with regular discs closer to 60 minutes."""
+    durations = [
+        3300.0,  # 55 min
+        1800.0,  # 30 min
+        1800.0,  # 30 min
+        3300.0,  # 55 min
+    ]
+
+    disc_numbers = _plan_disc_groups(durations)
+
+    assert disc_numbers == [1, 2, 2, 3]
+
+
 def test_allows_a_short_final_disc() -> None:
     """Keep a full 60-minute disc and allow a shorter final disc."""
     durations = [300.0] * 15
@@ -62,7 +90,7 @@ def test_writes_two_digit_disc_tags_and_preserves_title(
     first_tags = ID3(paths[0])
     second_tags = ID3(paths[1])
 
-    assert str(first_tags["TPOS"]) == "01/02"
-    assert str(second_tags["TPOS"]) == "02/02"
+    assert str(first_tags["TPOS"]) == "01"
+    assert str(second_tags["TPOS"]) == "02"
     assert str(first_tags["TIT2"]) == "Test title"
     assert str(second_tags["TIT2"]) == "Test title"

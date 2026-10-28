@@ -83,8 +83,6 @@ def test_continues_after_one_file_fails(
 
     def fake_split_audiobook(
         source_file: str | Path,
-        *,
-        disk: bool = False,
     ) -> SplitResult:
         name = Path(source_file).name
         processed.append(name)
@@ -238,27 +236,95 @@ def test_dry_run_counts_unplannable_file_as_skipped(
     assert_summary_count(output, "Failed:", 0)
 
 
-def test_disk_flag_is_passed_to_split_audiobook(
+def test_disk_flag_assigns_tags_to_new_output_files(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Pass the --disk option through to the splitting pipeline."""
-    (tmp_path / "Book.mp3").touch()
-    received_disk_values: list[bool] = []
+    """Assign disc tags after processing when --disk is enabled."""
+    source_file = tmp_path / "Book.mp3"
+    source_file.touch()
+
+    output_dir = tmp_path / "Book_cut"
+    output_files = [
+        output_dir / "Book_001.mp3",
+        output_dir / "Book_002.mp3",
+    ]
 
     def fake_split_audiobook(
         source_file: str | Path,
-        *,
-        disk: bool = False,
     ) -> SplitResult:
-        received_disk_values.append(disk)
+        output_dir.mkdir(exist_ok=True)
+        for path in output_files:
+            path.touch()
         return SplitResult.SPLIT
 
+    assigned_paths: list[list[Path]] = []
+
+    def fake_assign_disc_tags(paths: list[Path]) -> None:
+        assigned_paths.append(paths)
+
     monkeypatch.setattr(cli, "split_audiobook", fake_split_audiobook)
+    monkeypatch.setattr(cli, "assign_disc_tags", fake_assign_disc_tags)
+    monkeypatch.setattr(
+        cli,
+        "get_album_name",
+        lambda source: "Book",
+    )
     monkeypatch.setattr(
         "sys.argv",
         ["sleepsplit", "--disk", str(tmp_path)],
     )
 
     assert cli.main() == 0
-    assert received_disk_values == [True]
+    assert assigned_paths == [output_files]
+
+
+def test_disk_flag_assigns_tags_to_split_and_unsplit_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Assign disc tags to split files and copied unsplit files."""
+    source_files = [
+        tmp_path / "Book_part1.mp3",
+        tmp_path / "Book_part2.mp3",
+    ]
+    for source_file in source_files:
+        source_file.touch()
+
+    output_dir = tmp_path / "Book_cut"
+    split_outputs = [
+        output_dir / "Book_part1_001.mp3",
+        output_dir / "Book_part1_002.mp3",
+    ]
+    unsplit_output = output_dir / "Book_part2.mp3"
+
+    def fake_split_audiobook(
+        source_file: str | Path,
+    ) -> SplitResult:
+        output_dir.mkdir(exist_ok=True)
+
+        if Path(source_file).name == "Book_part1.mp3":
+            for path in split_outputs:
+                path.touch()
+            return SplitResult.SPLIT
+
+        unsplit_output.touch()
+        return SplitResult.SKIPPED
+
+    assigned_paths: list[list[Path]] = []
+
+    def fake_assign_disc_tags(paths: list[Path]) -> None:
+        assigned_paths.append(paths)
+
+    monkeypatch.setattr(cli, "split_audiobook", fake_split_audiobook)
+    monkeypatch.setattr(cli, "assign_disc_tags", fake_assign_disc_tags)
+    monkeypatch.setattr(cli, "get_album_name", lambda source: "Book")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["sleepsplit", "--disk", str(tmp_path)],
+    )
+
+    assert cli.main() == 0
+    assert assigned_paths == [
+        [*split_outputs, unsplit_output],
+    ]

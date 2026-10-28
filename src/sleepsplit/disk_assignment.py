@@ -122,7 +122,6 @@ def assign_disc_tags(output_paths: list[Path]) -> None:
 
     durations = [float(MP3(path).info.length) for path in output_paths]
     disc_numbers = _plan_disc_groups(durations)
-    total_discs = max(disc_numbers)
 
     # Calculate the complete assignment before modifying any tags.
     for path, disc_number in zip(output_paths, disc_numbers, strict=True):
@@ -135,7 +134,7 @@ def assign_disc_tags(output_paths: list[Path]) -> None:
         tags.add(
             TPOS(
                 encoding=3,
-                text=[f"{disc_number:02d}/{total_discs:02d}"],
+                text=[f"{disc_number:02d}"],
             )
         )
         tags.save(path)
