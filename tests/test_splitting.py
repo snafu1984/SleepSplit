@@ -440,3 +440,31 @@ def test_preserves_original_error_when_cleanup_fails(
         )
 
     assert outputs[0].exists()
+
+
+def test_warns_when_partial_output_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Warn when a partial output cannot be removed."""
+    from sleepsplit.splitting import _remove_partial_outputs
+
+    output = tmp_path / "book_001.mp3"
+    output.touch()
+
+    def failing_unlink(
+        path: Path,
+        *,
+        missing_ok: bool = False,
+    ) -> None:
+        raise OSError("Simulated cleanup failure")
+
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+
+    _remove_partial_outputs([output])
+
+    captured = capsys.readouterr()
+    assert "WARNING: Could not remove partial output" in captured.err
+    assert str(output) in captured.err
+    assert "Simulated cleanup failure" in captured.err

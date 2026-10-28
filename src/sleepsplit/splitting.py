@@ -2,6 +2,7 @@
 
 import math
 import subprocess
+import sys
 from itertools import pairwise
 from pathlib import Path
 
@@ -9,12 +10,15 @@ from sleepsplit.time_format import seconds_to_mp3splt_time
 
 
 def _remove_partial_outputs(output_paths: list[Path]) -> None:
-    """Remove output files that may have been partially created."""
+    """Remove partial outputs and warn if cleanup fails."""
     for path in output_paths:
         try:
             path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        except OSError as error:
+            print(
+                f"WARNING: Could not remove partial output {path}: {error}",
+                file=sys.stderr,
+            )
 
 
 def split_audio(
