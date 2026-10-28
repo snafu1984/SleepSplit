@@ -8,6 +8,28 @@ from sleepsplit.models import SplitResult
 from sleepsplit.pipeline import plan_audiobook, split_audiobook
 
 
+def _print_summary(
+    split_count: int,
+    skipped_count: int,
+    failed_count: int,
+    total_count: int,
+    *,
+    dry_run: bool = False,
+) -> None:
+    """Print a summary of the audiobook processing results."""
+    title = "Dry-run summary" if dry_run else "SleepSplit summary"
+    split_label = "Would split:" if dry_run else "Split successfully:"
+
+    print(f"\n{'=' * 50}")
+    print(title)
+    print(f"{'=' * 50}")
+    print(f"{split_label:<22}{split_count:>5}")
+    print(f"{'Skipped:':<22}{skipped_count:>5}")
+    print(f"{'Failed:':<22}{failed_count:>5}")
+    print(f"{'Total:':<22}{total_count:>5}")
+    print(f"{'=' * 50}")
+
+
 def main() -> int:
     """Run SleepSplit on all MP3 files in one directory."""
     parser = argparse.ArgumentParser(
@@ -106,11 +128,13 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    print("\nDry-run summary" if args.dry_run else "\nSummary")
-    print(f"{'Would split' if args.dry_run else 'Split successfully'}: {split_count}")
-    print(f"Skipped: {skipped_count}")
-    print(f"Failed: {failed_count}")
-    print(f"Total: {len(mp3_files)}")
+    _print_summary(
+        split_count,
+        skipped_count,
+        failed_count,
+        len(mp3_files),
+        dry_run=args.dry_run,
+    )
 
     return 1 if failed_count else 0
 

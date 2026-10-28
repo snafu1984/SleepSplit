@@ -8,6 +8,22 @@ from sleepsplit import cli
 from sleepsplit.models import SplitResult
 
 
+def assert_summary_count(
+    output: str,
+    label: str,
+    expected: int,
+) -> None:
+    """Assert the count displayed for one summary category."""
+    matching_lines = [
+        line
+        for line in output.splitlines()
+        if line.strip().startswith(label) and line.split(":")[-1].strip().isdigit()
+    ]
+
+    assert len(matching_lines) == 1
+    assert int(matching_lines[0].split(":")[-1].strip()) == expected
+
+
 def test_processes_only_mp3_files_in_specified_directory(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -80,8 +96,8 @@ def test_continues_after_one_file_fails(
     assert processed == ["01.mp3", "02.mp3"]
 
     output = capsys.readouterr()
-    assert "Failed: 1" in output.out
-    assert "Split successfully: 1" in output.out
+    assert_summary_count(output.out, "Failed:", 1)
+    assert_summary_count(output.out, "Split successfully:", 1)
     assert "simulated failure" in output.err
 
 
@@ -105,9 +121,9 @@ def test_skipped_file_is_counted_separately(
     assert cli.main() == 0
 
     output = capsys.readouterr().out
-    assert "Skipped: 1" in output
-    assert "Split successfully: 0" in output
-    assert "Failed: 0" in output
+    assert_summary_count(output, "Skipped:", 1)
+    assert_summary_count(output, "Split successfully:", 0)
+    assert_summary_count(output, "Failed:", 0)
 
 
 def test_rejects_nonexistent_directory(
@@ -185,8 +201,8 @@ def test_dry_run_displays_planned_outputs_without_splitting(
     assert "Cut 1: 300.00 seconds" in output
     assert str(output_paths[0]) in output
     assert str(output_paths[1]) in output
-    assert "Would split: 1" in output
-    assert "Failed: 0" in output
+    assert_summary_count(output, "Would split:", 1)
+    assert_summary_count(output, "Failed:", 0)
 
     assert not (tmp_path / "Book_cut").exists()
     assert source_file.is_file()
@@ -209,6 +225,6 @@ def test_dry_run_counts_unplannable_file_as_skipped(
     assert cli.main() == 0
 
     output = capsys.readouterr().out
-    assert "Skipped: 1" in output
-    assert "Would split: 0" in output
-    assert "Failed: 0" in output
+    assert_summary_count(output, "Skipped:", 1)
+    assert_summary_count(output, "Would split:", 0)
+    assert_summary_count(output, "Failed:", 0)
