@@ -39,7 +39,11 @@ def test_processes_only_mp3_files_in_specified_directory(
 
     processed: list[str] = []
 
-    def fake_split_audiobook(source_file: str | Path) -> SplitResult:
+    def fake_split_audiobook(
+        source_file: str | Path,
+        *,
+        disk: bool = False,
+    ) -> SplitResult:
         processed.append(Path(source_file).name)
         return SplitResult.SPLIT
 
@@ -77,7 +81,11 @@ def test_continues_after_one_file_fails(
 
     processed: list[str] = []
 
-    def fake_split_audiobook(source_file: str | Path) -> SplitResult:
+    def fake_split_audiobook(
+        source_file: str | Path,
+        *,
+        disk: bool = False,
+    ) -> SplitResult:
         name = Path(source_file).name
         processed.append(name)
 
@@ -111,7 +119,7 @@ def test_skipped_file_is_counted_separately(
     monkeypatch.setattr(
         cli,
         "split_audiobook",
-        lambda source_file: SplitResult.SKIPPED,
+        lambda source_file, *, disk=False: SplitResult.SKIPPED,
     )
     monkeypatch.setattr(
         "sys.argv",
@@ -228,3 +236,29 @@ def test_dry_run_counts_unplannable_file_as_skipped(
     assert_summary_count(output, "Skipped:", 1)
     assert_summary_count(output, "Would split:", 0)
     assert_summary_count(output, "Failed:", 0)
+
+
+def test_disk_flag_is_passed_to_split_audiobook(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Pass the --disk option through to the splitting pipeline."""
+    (tmp_path / "Book.mp3").touch()
+    received_disk_values: list[bool] = []
+
+    def fake_split_audiobook(
+        source_file: str | Path,
+        *,
+        disk: bool = False,
+    ) -> SplitResult:
+        received_disk_values.append(disk)
+        return SplitResult.SPLIT
+
+    monkeypatch.setattr(cli, "split_audiobook", fake_split_audiobook)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["sleepsplit", "--disk", str(tmp_path)],
+    )
+
+    assert cli.main() == 0
+    assert received_disk_values == [True]

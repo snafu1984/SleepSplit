@@ -49,6 +49,11 @@ def main() -> int:
         action="store_true",
         help="Analyze files and show the planned outputs without modifying files.",
     )
+    parser.add_argument(
+        "--disk",
+        action="store_true",
+        help="Assign disc numbers to split MP3 files using ID3 TPOS tags.",
+    )
     args = parser.parse_args()
 
     directory = args.directory.expanduser()
@@ -102,7 +107,7 @@ def main() -> int:
                     for output_path in plan.output_paths:
                         print(f"    {output_path}")
             else:
-                result = split_audiobook(source_file)
+                result = split_audiobook(source_file, disk=args.disk)
 
         except (OSError, RuntimeError, ValueError) as exc:
             failed_count += 1

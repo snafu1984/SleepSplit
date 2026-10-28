@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sleepsplit.analysis import plan_cut_points
 from sleepsplit.audio_metadata import get_album_name, get_audio_duration
+from sleepsplit.disk_assignment import assign_disc_tags
 from sleepsplit.ffmpeg_analysis import detect_silence
 from sleepsplit.models import AudiobookPlan, SplitResult
 from sleepsplit.output_planning import plan_output_paths
@@ -76,6 +77,7 @@ def split_audiobook(
     source_file: str | Path,
     *,
     dry_run: bool = False,
+    disk: bool = False,
 ) -> SplitResult:
     """Split an audiobook, or only plan the split in dry-run mode.
 
@@ -98,5 +100,8 @@ def split_audiobook(
 
     _check_output_paths(plan.output_paths)
     split_audio(source_file, plan.cut_points, plan.output_paths)
+
+    if disk:
+        assign_disc_tags(plan.output_paths)
 
     return SplitResult.SPLIT
