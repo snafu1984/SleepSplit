@@ -14,3 +14,6 @@ packages = ["src/sleepsplit"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.11"]
+
+[project.scripts]
+sleepsplit = "sleepsplit.cli:main"

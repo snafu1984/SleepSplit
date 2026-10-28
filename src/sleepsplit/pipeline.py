@@ -6,6 +6,7 @@ from pathlib import Path
 from sleepsplit.analysis import plan_cut_points
 from sleepsplit.audio_metadata import get_album_name, get_audio_duration
 from sleepsplit.ffmpeg_analysis import detect_silence
+from sleepsplit.models import SplitResult
 from sleepsplit.output_planning import plan_output_paths
 from sleepsplit.splitting import split_audio
 
@@ -19,8 +20,11 @@ def _check_output_paths(output_paths: list[Path]) -> None:
         raise FileExistsError(f"Output file(s) already exist: {names}")
 
 
-def split_audiobook(source_file: str | Path) -> None:
+def split_audiobook(source_file: str | Path) -> SplitResult:
     """Split an audiobook at suitable pauses.
+
+    Return SPLIT when the audiobook was split successfully.
+    Return SKIPPED when no suitable cut points were found.
 
     If no suitable cut points are found, leave the source file untouched
     and do not create output files or directories.
@@ -34,7 +38,7 @@ def split_audiobook(source_file: str | Path) -> None:
     cut_points = plan_cut_points(pauses, audio_duration=duration)
 
     if not cut_points:
-        return
+        return SplitResult.SKIPPED
 
     album_name = get_album_name(source_file)
     output_paths = plan_output_paths(
@@ -45,3 +49,5 @@ def split_audiobook(source_file: str | Path) -> None:
 
     _check_output_paths(output_paths)
     split_audio(source_file, cut_points, output_paths)
+
+    return SplitResult.SPLIT
