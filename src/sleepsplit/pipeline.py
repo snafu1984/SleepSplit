@@ -1,6 +1,7 @@
 """Coordinate the audiobook splitting workflow."""
 
 import math
+import shutil
 from pathlib import Path
 
 from sleepsplit.analysis import plan_cut_points
@@ -51,6 +52,26 @@ def plan_audiobook(source_file: str | Path) -> AudiobookPlan | None:
     )
 
 
+def _copy_unsplittable_audiobook(
+    source_file: Path,
+    *,
+    dry_run: bool = False,
+) -> None:
+    """Copy an audiobook without suitable cuts to its output directory."""
+    album_name = get_album_name(source_file).strip()
+    output_dir = source_file.parent / (f"{album_name}_cut" if album_name else "cut")
+    output_file = output_dir / source_file.name
+
+    if output_file.exists():
+        raise FileExistsError(f"Output file already exists: {output_file.name}")
+
+    if dry_run:
+        return
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_file, output_file)
+
+
 def split_audiobook(
     source_file: str | Path,
     *,
@@ -66,6 +87,10 @@ def split_audiobook(
     plan = plan_audiobook(source_file)
 
     if plan is None:
+        _copy_unsplittable_audiobook(
+            Path(source_file),
+            dry_run=dry_run,
+        )
         return SplitResult.SKIPPED
 
     if dry_run:

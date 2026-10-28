@@ -7,12 +7,14 @@ import pytest
 from sleepsplit import pipeline
 
 
-def test_does_nothing_when_no_cut_points_are_found(
+def test_copies_audiobook_when_no_cut_points_are_found(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    """Copy an audiobook to the output directory when it cannot be split."""
     source_file = tmp_path / "audiobook.mp3"
-    source_file.touch()
+    original_content = b"original audiobook data"
+    source_file.write_bytes(original_content)
 
     monkeypatch.setattr(
         "sleepsplit.pipeline.get_audio_duration",
@@ -20,27 +22,81 @@ def test_does_nothing_when_no_cut_points_are_found(
     )
     monkeypatch.setattr(
         "sleepsplit.pipeline.get_album_name",
-        lambda audio_file: "Test_Album_cut",
+        lambda audio_file: "Test_Album",
     )
     monkeypatch.setattr(
         "sleepsplit.pipeline.detect_silence",
         lambda audio_file: [],
     )
 
-    def unexpected_call(*args, **kwargs):
-        raise AssertionError("No output planning or splitting should occur.")
+    result = pipeline.split_audiobook(source_file)
+
+    output_file = tmp_path / "Test_Album_cut" / "audiobook.mp3"
+
+    assert result is pipeline.SplitResult.SKIPPED
+    assert output_file.read_bytes() == original_content
+    assert source_file.read_bytes() == original_content
+    assert source_file.is_file()
+
+
+def test_does_not_overwrite_existing_unsplittable_output(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Preserve an existing output file when the audiobook cannot be split."""
+    source_file = tmp_path / "audiobook.mp3"
+    source_file.write_bytes(b"original content")
+
+    output_dir = tmp_path / "Test_Album_cut"
+    output_dir.mkdir()
+    output_file = output_dir / "audiobook.mp3"
+    output_file.write_bytes(b"existing content")
 
     monkeypatch.setattr(
-        "sleepsplit.pipeline.plan_output_paths",
-        unexpected_call,
+        "sleepsplit.pipeline.get_audio_duration",
+        lambda audio_file: 200.0,
     )
     monkeypatch.setattr(
-        "sleepsplit.pipeline.split_audio",
-        unexpected_call,
+        "sleepsplit.pipeline.get_album_name",
+        lambda audio_file: "Test_Album",
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.detect_silence",
+        lambda audio_file: [],
     )
 
-    pipeline.split_audiobook(source_file)
+    with pytest.raises(FileExistsError):
+        pipeline.split_audiobook(source_file)
 
+    assert output_file.read_bytes() == b"existing content"
+
+
+def test_dry_run_does_not_copy_unsplittable_audiobook(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Do not create output files during a dry-run with no suitable cuts."""
+    source_file = tmp_path / "audiobook.mp3"
+    original_content = b"original audiobook data"
+    source_file.write_bytes(original_content)
+
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_audio_duration",
+        lambda audio_file: 200.0,
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_album_name",
+        lambda audio_file: "Test_Album",
+    )
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.detect_silence",
+        lambda audio_file: [],
+    )
+
+    result = pipeline.split_audiobook(source_file, dry_run=True)
+
+    assert result is pipeline.SplitResult.SKIPPED
+    assert source_file.read_bytes() == original_content
     assert list(tmp_path.iterdir()) == [source_file]
 
 
@@ -247,6 +303,11 @@ def test_dry_run_skips_when_no_cut_points_are_found(
     monkeypatch.setattr(
         "sleepsplit.pipeline.detect_silence",
         lambda audio_file: [],
+    )
+
+    monkeypatch.setattr(
+        "sleepsplit.pipeline.get_album_name",
+        lambda audio_file: "Test_Album",
     )
 
     result = pipeline.split_audiobook(source_file, dry_run=True)
