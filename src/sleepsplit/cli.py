@@ -113,7 +113,35 @@ def main() -> int:
         help="Sort output MP3 files into CD directories and create M3U playlists.",
     )
 
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Enable all processing options.",
+    )
+    parser.add_argument(
+        "--ipod",
+        action="store_true",
+        help="Enable track numbering, title assignment and file renaming.",
+    )
+
     args = parser.parse_args()
+
+    # Resolve combined processing options.
+    if args.full:
+        args.disk = True
+        args.track = True
+        args.title = True
+        args.file = True
+        args.sort_cd = True
+
+    if args.ipod:
+        args.track = True
+        args.title = True
+        args.file = True
+
+    # --title automatically enables track numbering.
+    if args.title:
+        args.track = True
 
     # --title automatically enables track numbering.
     if args.title:
