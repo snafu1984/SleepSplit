@@ -58,8 +58,12 @@ def _copy_unsplittable_audiobook(
     dry_run: bool = False,
 ) -> None:
     """Copy an audiobook without suitable cuts to its output directory."""
-    album_name = get_album_name(source_file).strip()
-    output_dir = source_file.parent / (f"{album_name}_cut" if album_name else "cut")
+    output_paths = plan_output_paths(
+        source_file,
+        get_album_name(source_file),
+        segment_count=1,
+    )
+    output_dir = output_paths[0].parent
     output_file = output_dir / source_file.name
 
     if output_file.exists():

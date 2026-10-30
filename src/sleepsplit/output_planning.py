@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from sleepsplit.file_assignment import normalize_filename
+
 
 def plan_output_paths(
     source_file: str | Path,
@@ -20,6 +22,8 @@ def plan_output_paths(
         album_name in {".", ".."} or "/" in album_name or "\\" in album_name
     ):
         raise ValueError("album_name must be a single directory name")
+
+    album_name = normalize_filename(album_name)
 
     if not isinstance(segment_count, int) or isinstance(segment_count, bool):
         raise TypeError("segment_count must be an integer")

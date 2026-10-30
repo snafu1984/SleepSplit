@@ -5,8 +5,13 @@ import sys
 from pathlib import Path
 
 from sleepsplit.audio_metadata import get_album_name
+from sleepsplit.disc_sorting import plan_disc_sorting, sort_files_by_disc
 from sleepsplit.disk_assignment import assign_disc_tags
-from sleepsplit.file_assignment import plan_file_renames, rename_files_from_titles
+from sleepsplit.file_assignment import (
+    normalize_filename,
+    plan_file_renames,
+    rename_files_from_titles,
+)
 from sleepsplit.models import SplitResult
 from sleepsplit.pipeline import plan_audiobook, split_audiobook
 from sleepsplit.title_assignment import assign_title_tags
@@ -36,13 +41,23 @@ def _print_summary(
 
 
 def _get_output_dir(source_file: Path) -> Path:
-    """Return the output directory for an audiobook."""
+    """Return a normalized output directory for an audiobook."""
     album_name = get_album_name(source_file).strip()
-    return source_file.parent / (f"{album_name}_cut" if album_name else "cut")
+    normalized_name = normalize_filename(album_name)
+
+    if normalized_name:
+        directory_name = f"{normalized_name}_cut"
+    else:
+        directory_name = "cut"
+
+    return source_file.parent / directory_name
 
 
 def _get_mp3_files(directory: Path) -> list[Path]:
     """Return top-level MP3 files in case-insensitive filename order."""
+    if not directory.is_dir():
+        return []
+
     return sorted(
         (
             path
@@ -87,11 +102,15 @@ def main() -> int:
         action="store_true",
         help="Prefix MP3 titles with their track numbers.",
     )
-
     parser.add_argument(
         "--file",
         action="store_true",
         help="Rename output MP3 files using their normalized ID3 titles.",
+    )
+    parser.add_argument(
+        "--sort_cd",
+        action="store_true",
+        help="Sort output MP3 files into CD directories and create M3U playlists.",
     )
 
     args = parser.parse_args()
@@ -121,7 +140,7 @@ def main() -> int:
     skipped_count = 0
     failed_count = 0
 
-    # Collect output directories for metadata assignment after processing.
+    # Collect output directories for post-processing.
     output_dirs: set[Path] = set()
 
     for source_file in mp3_files:
@@ -134,7 +153,7 @@ def main() -> int:
                 if plan is None:
                     result = SplitResult.SKIPPED
 
-                    if args.disk or args.track or args.file:
+                    if args.disk or args.track or args.file or args.sort_cd:
                         output_dir = _get_output_dir(source_file)
                         output_dirs.add(output_dir)
                         print(f"  Planned copied file: {output_dir / source_file.name}")
@@ -142,7 +161,7 @@ def main() -> int:
                     result = SplitResult.SPLIT
                     output_dir = plan.output_paths[0].parent
 
-                    if args.disk or args.track or args.file:
+                    if args.disk or args.track or args.file or args.sort_cd:
                         output_dirs.add(output_dir)
 
                     print(f"  Planned cuts: {len(plan.cut_points)}")
@@ -160,7 +179,7 @@ def main() -> int:
             else:
                 result = split_audiobook(source_file)
 
-                if args.disk or args.track or args.file:
+                if args.disk or args.track or args.file or args.sort_cd:
                     output_dir = _get_output_dir(source_file)
                     output_dirs.add(output_dir)
 
@@ -188,7 +207,7 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    if args.disk or args.track or args.file:
+    if args.disk or args.track or args.file or args.sort_cd:
         for output_dir in sorted(
             output_dirs,
             key=lambda path: str(path).casefold(),
@@ -205,6 +224,8 @@ def main() -> int:
                 if args.title:
                     print("  Titles (TIT2): would be assigned third.")
 
+                planned_renames: dict[Path, Path] = {}
+
                 if args.file:
                     rename_plan, warnings = plan_file_renames(
                         _get_mp3_files(output_dir)
@@ -213,9 +234,40 @@ def main() -> int:
                     print("  Filenames: planned renames:")
                     for source, target in rename_plan:
                         print(f"    {source.name} -> {target.name}")
+                        planned_renames[source] = target
 
                     for warning in warnings:
                         print(f"  WARNING: {warning}")
+
+                if args.sort_cd:
+                    print("  CD sorting: planned moves:")
+
+                    if output_dir.is_dir():
+                        moves, warnings, affected_dirs = plan_disc_sorting(output_dir)
+
+                        for source, destination in moves:
+                            display_name = planned_renames.get(
+                                source,
+                                source,
+                            ).name
+                            print(f"    {display_name} -> {destination.parent.name}/")
+
+                        for warning in warnings:
+                            print(f"  WARNING: {warning}")
+
+                        for folder in sorted(
+                            affected_dirs,
+                            key=lambda path: path.name.casefold(),
+                        ):
+                            print(
+                                f"  Playlist: {folder.name}/"
+                                f"{folder.name}.m3u would be created or updated."
+                            )
+                    else:
+                        print(
+                            "    Output directory does not exist yet; "
+                            "disc assignments cannot be determined."
+                        )
 
                 continue
 
@@ -227,8 +279,8 @@ def main() -> int:
 
                 output_paths = _get_mp3_files(output_dir)
 
-                # Always assign metadata in this order:
-                # TPOS -> TRCK -> TIT2
+                # Always process metadata in this order:
+                # TPOS -> TRCK -> TIT2 -> filename -> CD sorting.
                 if args.disk:
                     assign_disc_tags(output_paths)
                     print(f"Assigned disc numbers: {output_dir.name}")
@@ -250,10 +302,30 @@ def main() -> int:
                     for warning in warnings:
                         print(f"WARNING: {warning}", file=sys.stderr)
 
+                if args.sort_cd:
+                    moved_files, warnings, playlist_counts = sort_files_by_disc(
+                        output_dir
+                    )
+
+                    for source, destination in moved_files:
+                        print(f"Moved: {source.name} -> {destination.parent.name}/")
+
+                    for warning in warnings:
+                        print(f"WARNING: {warning}", file=sys.stderr)
+
+                    for folder, track_count in sorted(
+                        playlist_counts.items(),
+                        key=lambda item: item[0].name.casefold(),
+                    ):
+                        print(
+                            f"Playlist created: {folder.name}/"
+                            f"{folder.name}.m3u ({track_count} tracks)"
+                        )
+
             except (OSError, RuntimeError, ValueError) as exc:
                 failed_count += 1
                 print(
-                    f"ERROR: Metadata assignment for {output_dir.name}: {exc}",
+                    f"ERROR: Processing {output_dir.name}: {exc}",
                     file=sys.stderr,
                 )
 

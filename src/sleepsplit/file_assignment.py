@@ -21,14 +21,10 @@ def normalize_filename(title: str) -> str:
     for character, replacement in replacements.items():
         title = title.replace(character, replacement)
 
-    # Replace all characters except letters, digits, spaces and hyphens.
     title = re.sub(r"[^A-Za-z0-9-]", "_", title)
-
-    # Collapse multiple underscores and remove leading underscores.
     title = re.sub(r"_+", "_", title)
-    title = title.lstrip("_")
 
-    return title.strip()
+    return title.strip("_")
 
 
 def plan_file_renames(
