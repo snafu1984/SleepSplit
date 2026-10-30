@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sleepsplit.audio_metadata import get_album_name
 from sleepsplit.disk_assignment import assign_disc_tags
+from sleepsplit.file_assignment import plan_file_renames, rename_files_from_titles
 from sleepsplit.models import SplitResult
 from sleepsplit.pipeline import plan_audiobook, split_audiobook
 from sleepsplit.title_assignment import assign_title_tags
@@ -87,6 +88,12 @@ def main() -> int:
         help="Prefix MP3 titles with their track numbers.",
     )
 
+    parser.add_argument(
+        "--file",
+        action="store_true",
+        help="Rename output MP3 files using their normalized ID3 titles.",
+    )
+
     args = parser.parse_args()
 
     # --title automatically enables track numbering.
@@ -127,7 +134,7 @@ def main() -> int:
                 if plan is None:
                     result = SplitResult.SKIPPED
 
-                    if args.disk or args.track:
+                    if args.disk or args.track or args.file:
                         output_dir = _get_output_dir(source_file)
                         output_dirs.add(output_dir)
                         print(f"  Planned copied file: {output_dir / source_file.name}")
@@ -135,7 +142,7 @@ def main() -> int:
                     result = SplitResult.SPLIT
                     output_dir = plan.output_paths[0].parent
 
-                    if args.disk or args.track:
+                    if args.disk or args.track or args.file:
                         output_dirs.add(output_dir)
 
                     print(f"  Planned cuts: {len(plan.cut_points)}")
@@ -153,7 +160,7 @@ def main() -> int:
             else:
                 result = split_audiobook(source_file)
 
-                if args.disk or args.track:
+                if args.disk or args.track or args.file:
                     output_dir = _get_output_dir(source_file)
                     output_dirs.add(output_dir)
 
@@ -181,7 +188,7 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    if args.disk or args.track:
+    if args.disk or args.track or args.file:
         for output_dir in sorted(
             output_dirs,
             key=lambda path: str(path).casefold(),
@@ -197,6 +204,18 @@ def main() -> int:
 
                 if args.title:
                     print("  Titles (TIT2): would be assigned third.")
+
+                if args.file:
+                    rename_plan, warnings = plan_file_renames(
+                        _get_mp3_files(output_dir)
+                    )
+
+                    print("  Filenames: planned renames:")
+                    for source, target in rename_plan:
+                        print(f"    {source.name} -> {target.name}")
+
+                    for warning in warnings:
+                        print(f"  WARNING: {warning}")
 
                 continue
 
@@ -221,6 +240,15 @@ def main() -> int:
                 if args.title:
                     assign_title_tags(output_paths)
                     print(f"Assigned titles: {output_dir.name}")
+
+                if args.file:
+                    renamed_files, warnings = rename_files_from_titles(output_paths)
+
+                    for source, target in renamed_files:
+                        print(f"Renamed: {source.name} -> {target.name}")
+
+                    for warning in warnings:
+                        print(f"WARNING: {warning}", file=sys.stderr)
 
             except (OSError, RuntimeError, ValueError) as exc:
                 failed_count += 1
