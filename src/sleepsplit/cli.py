@@ -8,6 +8,7 @@ from sleepsplit.audio_metadata import get_album_name
 from sleepsplit.disk_assignment import assign_disc_tags
 from sleepsplit.models import SplitResult
 from sleepsplit.pipeline import plan_audiobook, split_audiobook
+from sleepsplit.title_assignment import assign_title_tags
 from sleepsplit.track_assignment import assign_track_tags
 
 
@@ -80,7 +81,17 @@ def main() -> int:
         action="store_true",
         help="Assign track numbers to output MP3 files using ID3 TRCK tags.",
     )
+    parser.add_argument(
+        "--title",
+        action="store_true",
+        help="Prefix MP3 titles with their track numbers.",
+    )
+
     args = parser.parse_args()
+
+    # --title automatically enables track numbering.
+    if args.title:
+        args.track = True
 
     directory = args.directory.expanduser()
 
@@ -110,9 +121,6 @@ def main() -> int:
         print(f"\nProcessing: {source_file.name}")
 
         try:
-            if args.dry_run:
-                plan = plan_audiobook(source_file)
-
             if args.dry_run:
                 plan = plan_audiobook(source_file)
 
@@ -187,6 +195,9 @@ def main() -> int:
                 if args.track:
                     print("  Track numbers (TRCK): would be assigned second.")
 
+                if args.title:
+                    print("  Titles (TIT2): would be assigned third.")
+
                 continue
 
             try:
@@ -197,6 +208,8 @@ def main() -> int:
 
                 output_paths = _get_mp3_files(output_dir)
 
+                # Always assign metadata in this order:
+                # TPOS -> TRCK -> TIT2
                 if args.disk:
                     assign_disc_tags(output_paths)
                     print(f"Assigned disc numbers: {output_dir.name}")
@@ -204,6 +217,10 @@ def main() -> int:
                 if args.track:
                     assign_track_tags(output_paths)
                     print(f"Assigned track numbers: {output_dir.name}")
+
+                if args.title:
+                    assign_title_tags(output_paths)
+                    print(f"Assigned titles: {output_dir.name}")
 
             except (OSError, RuntimeError, ValueError) as exc:
                 failed_count += 1
