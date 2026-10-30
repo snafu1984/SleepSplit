@@ -8,6 +8,7 @@ from sleepsplit.audio_metadata import get_album_name
 from sleepsplit.disk_assignment import assign_disc_tags
 from sleepsplit.models import SplitResult
 from sleepsplit.pipeline import plan_audiobook, split_audiobook
+from sleepsplit.track_assignment import assign_track_tags
 
 
 def _print_summary(
@@ -38,6 +39,18 @@ def _get_output_dir(source_file: Path) -> Path:
     return source_file.parent / (f"{album_name}_cut" if album_name else "cut")
 
 
+def _get_mp3_files(directory: Path) -> list[Path]:
+    """Return top-level MP3 files in case-insensitive filename order."""
+    return sorted(
+        (
+            path
+            for path in directory.iterdir()
+            if path.is_file() and path.suffix.lower() == ".mp3"
+        ),
+        key=lambda path: path.name.casefold(),
+    )
+
+
 def main() -> int:
     """Run SleepSplit on all MP3 files in one directory."""
     parser = argparse.ArgumentParser(
@@ -62,6 +75,11 @@ def main() -> int:
         action="store_true",
         help="Assign disc numbers to output MP3 files using ID3 TPOS tags.",
     )
+    parser.add_argument(
+        "--track",
+        action="store_true",
+        help="Assign track numbers to output MP3 files using ID3 TRCK tags.",
+    )
     args = parser.parse_args()
 
     directory = args.directory.expanduser()
@@ -72,14 +90,7 @@ def main() -> int:
     if not directory.is_dir():
         parser.error(f"Path is not a directory: {directory}")
 
-    mp3_files = sorted(
-        (
-            path
-            for path in directory.iterdir()
-            if path.is_file() and path.suffix.lower() == ".mp3"
-        ),
-        key=lambda path: path.name.casefold(),
-    )
+    mp3_files = _get_mp3_files(directory)
 
     if not mp3_files:
         print(f"No MP3 files found in: {directory}")
@@ -92,8 +103,8 @@ def main() -> int:
     skipped_count = 0
     failed_count = 0
 
-    # Only files newly created during this invocation are tagged.
-    outputs_by_dir: dict[Path, set[Path]] = {}
+    # Collect output directories for metadata assignment after processing.
+    output_dirs: set[Path] = set()
 
     for source_file in mp3_files:
         print(f"\nProcessing: {source_file.name}")
@@ -102,10 +113,23 @@ def main() -> int:
             if args.dry_run:
                 plan = plan_audiobook(source_file)
 
+            if args.dry_run:
+                plan = plan_audiobook(source_file)
+
                 if plan is None:
                     result = SplitResult.SKIPPED
+
+                    if args.disk or args.track:
+                        output_dir = _get_output_dir(source_file)
+                        output_dirs.add(output_dir)
+                        print(f"  Planned copied file: {output_dir / source_file.name}")
                 else:
                     result = SplitResult.SPLIT
+                    output_dir = plan.output_paths[0].parent
+
+                    if args.disk or args.track:
+                        output_dirs.add(output_dir)
+
                     print(f"  Planned cuts: {len(plan.cut_points)}")
 
                     for index, cut_point in enumerate(
@@ -117,24 +141,13 @@ def main() -> int:
                     print("  Planned output files:")
                     for output_path in plan.output_paths:
                         print(f"    {output_path}")
-            else:
-                output_dir = _get_output_dir(source_file) if args.disk else None
-                existing_outputs = (
-                    set(output_dir.glob("*.mp3"))
-                    if output_dir is not None and output_dir.exists()
-                    else set()
-                )
 
+            else:
                 result = split_audiobook(source_file)
 
-                if args.disk and output_dir is not None:
-                    current_outputs = (
-                        set(output_dir.glob("*.mp3")) if output_dir.exists() else set()
-                    )
-                    new_outputs = current_outputs - existing_outputs
-
-                    if new_outputs:
-                        outputs_by_dir.setdefault(output_dir, set()).update(new_outputs)
+                if args.disk or args.track:
+                    output_dir = _get_output_dir(source_file)
+                    output_dirs.add(output_dir)
 
         except (OSError, RuntimeError, ValueError) as exc:
             failed_count += 1
@@ -160,22 +173,42 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    if args.disk and not args.dry_run:
-        for output_dir, output_paths in sorted(
-            outputs_by_dir.items(),
-            key=lambda item: str(item[0]).casefold(),
+    if args.disk or args.track:
+        for output_dir in sorted(
+            output_dirs,
+            key=lambda path: str(path).casefold(),
         ):
+            if args.dry_run:
+                print(f"\nPlanned metadata assignment: {output_dir.name}")
+
+                if args.disk:
+                    print("  Disc numbers (TPOS): would be assigned first.")
+
+                if args.track:
+                    print("  Track numbers (TRCK): would be assigned second.")
+
+                continue
+
             try:
-                ordered_paths = sorted(
-                    output_paths,
-                    key=lambda path: path.name.casefold(),
-                )
-                assign_disc_tags(ordered_paths)
-                print(f"Assigned disc numbers: {output_dir.name}")
+                if not output_dir.is_dir():
+                    raise FileNotFoundError(
+                        f"Output directory does not exist: {output_dir}"
+                    )
+
+                output_paths = _get_mp3_files(output_dir)
+
+                if args.disk:
+                    assign_disc_tags(output_paths)
+                    print(f"Assigned disc numbers: {output_dir.name}")
+
+                if args.track:
+                    assign_track_tags(output_paths)
+                    print(f"Assigned track numbers: {output_dir.name}")
+
             except (OSError, RuntimeError, ValueError) as exc:
                 failed_count += 1
                 print(
-                    f"ERROR: Disc assignment for {output_dir.name}: {exc}",
+                    f"ERROR: Metadata assignment for {output_dir.name}: {exc}",
                     file=sys.stderr,
                 )
 
