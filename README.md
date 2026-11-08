@@ -1,5 +1,7 @@
 # SleepSplit
 
+**Version 0.9.0**
+
 SleepSplit is a Python command-line application that splits long MP3 audiobooks into smaller listening segments suitable for bedtime listening.
 
 It detects silences and plans cuts at suitable pause points. MP3 files are split using `mp3splt` to preserve the original audio quality.
@@ -12,7 +14,7 @@ It detects silences and plans cuts at suitable pause points. MP3 files are split
 - Sequentially numbered output files
 - Preservation of audio metadata through MP3 splitting
 - Optional disc-number assignment based on segment durations
-- ID3 `TPOS` tags with two-digit disc numbers (`01`, `02`, `03`, ...)
+- ID3 `TPOS` tags containing two-digit disc numbers (`01`, `02`, `03`, ...)
 - ID3 `TRCK` track-number assignment
 - Automatic title numbering using ID3 `TIT2` tags
 - Optional MP3 file renaming based on ID3 titles
@@ -20,7 +22,6 @@ It detects silences and plans cuts at suitable pause points. MP3 files are split
 - Automatic M3U playlist creation for CD directories
 - Combined processing options for full audiobook processing or iPod-compatible organization
 - Dry-run mode to inspect planned operations without modifying files
-- Command-line interface
 
 SleepSplit processes MP3 files directly inside the specified directory. Subdirectories are not searched.
 
@@ -47,7 +48,7 @@ The optional `--disk` argument assigns disc numbers to the generated MP3 files b
 - **Final disc:** may be shorter than 55 minutes.
 - **Maximum segment duration:** a segment longer than 65 minutes cannot be assigned to a disc.
 
-Disc numbers are written to the ID3 `TPOS` tag as two-digit values, such as `01`, `02`, and `03`.
+Disc numbers are written to the ID3 `TPOS` tag as two-digit values, such as `01`, `02`, and `03`. The total number of discs is not appended.
 
 Disc assignment does not change the audio segments themselves. It adds disc-number metadata to the output files.
 
@@ -92,7 +93,7 @@ sleepsplit /path/to/audiobooks --track --title --file
 
 ## CD Sorting and Playlists
 
-The optional `--sort_cd` argument sorts MP3 files into separate directories based on their ID3 `TPOS` disc numbers.
+The optional `--sort-cd` argument sorts MP3 files into separate directories based on their ID3 `TPOS` disc numbers.
 
 Directories are named using two-digit disc numbers:
 
@@ -107,10 +108,10 @@ For each affected CD directory, SleepSplit creates or updates an M3U playlist co
 Example:
 
 ```bash
-sleepsplit /path/to/audiobooks --disk --sort_cd
+sleepsplit /path/to/audiobooks --disk --sort-cd
 ```
 
-The `--sort_cd` option requires valid disc-number information in the ID3 `TPOS` tags. Files without valid disc numbers are skipped with a warning.
+The `--sort-cd` option requires valid disc-number information in the ID3 `TPOS` tags. Files without valid disc numbers are skipped with a warning.
 
 ## Combined Processing Options
 
@@ -118,13 +119,13 @@ SleepSplit provides two combined options for common workflows.
 
 ### Full processing: `--full`
 
-The `--full` argument enables all available processing steps:
+The `--full` argument enables all processing steps:
 
 - `--disk`: assign disc numbers (`TPOS`)
 - `--track`: assign track numbers (`TRCK`)
 - `--title`: prefix titles (`TIT2`) with track numbers
 - `--file`: rename MP3 files using their ID3 titles
-- `--sort_cd`: sort files into CD directories and create M3U playlists
+- `--sort-cd`: sort files into CD directories and create M3U playlists
 
 Example:
 
@@ -163,7 +164,7 @@ Both combined options can be used together with `--dry-run`.
 Clone the repository and enter the project directory:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/USERNAME/SleepSplit.git
 cd SleepSplit
 ```
 
@@ -198,16 +199,25 @@ sleepsplit /path/to/audiobooks
 
 SleepSplit analyzes the MP3 files and creates output directories for the generated segments.
 
+### Command-line Help
+
+Display the complete command-line help:
+
+```bash
+sleepsplit --help
+```
+
 ### Command-line Options
 
 | Option | Description |
 |---|---|
+| `-h`, `--help` | Display the command-line help and exit. |
 | `--dry-run` | Preview planned operations without modifying files. |
 | `--disk` | Assign disc numbers using ID3 `TPOS` tags. |
 | `--track` | Assign track numbers using ID3 `TRCK` tags. |
 | `--title` | Prefix ID3 titles with track numbers. Automatically enables `--track`. |
 | `--file` | Rename MP3 files using their normalized ID3 titles. |
-| `--sort_cd` | Sort files into CD directories and create M3U playlists. |
+| `--sort-cd` | Sort files into CD directories and create M3U playlists. |
 | `--full` | Enable all processing options. |
 | `--ipod` | Enable track numbering, title assignment and file renaming. |
 

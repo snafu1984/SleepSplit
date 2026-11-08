@@ -70,58 +70,97 @@ def _get_mp3_files(directory: Path) -> list[Path]:
 
 def main() -> int:
     """Run SleepSplit on all MP3 files in one directory."""
+
     parser = argparse.ArgumentParser(
         prog="sleepsplit",
         description=(
-            "Split MP3 audiobooks in the specified directory. "
-            "Subdirectories are not searched."
+            "SleepSplit - Split MP3 audiobooks into bedtime-friendly "
+            "listening segments."
         ),
+        epilog=(
+            "Examples:\n"
+            "  sleepsplit ./Audiobook --dry-run\n"
+            "  sleepsplit ./Audiobook --track --disk\n"
+            "  sleepsplit ./Audiobook --ipod\n"
+            "  sleepsplit ./Audiobook --full\n"
+            "\n"
+            "Only MP3 files directly inside the specified directory are "
+            "processed. Subdirectories are not searched."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+
     parser.add_argument(
         "directory",
         type=Path,
-        help="Directory containing MP3 files to process.",
+        help="Directory containing the audiobook MP3 files.",
     )
+
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Analyze files and show the planned outputs without modifying files.",
+        help=(
+            "Analyze files and display planned operations without "
+            "creating or modifying files."
+        ),
     )
+
     parser.add_argument(
         "--disk",
         action="store_true",
-        help="Assign disc numbers to output MP3 files using ID3 TPOS tags.",
+        help=(
+            "Assign disc numbers using ID3 TPOS tags. "
+            "Numbers are written with leading zeros (01, 02, ...)."
+        ),
     )
+
     parser.add_argument(
         "--track",
         action="store_true",
-        help="Assign track numbers to output MP3 files using ID3 TRCK tags.",
+        help=(
+            "Assign sequential track numbers using ID3 TRCK tags. "
+            "Numbers are written with leading zeros (01, 02, ...)."
+        ),
     )
+
     parser.add_argument(
         "--title",
         action="store_true",
-        help="Prefix MP3 titles with their track numbers.",
+        help=(
+            "Prefix ID3 titles (TIT2) with their track numbers. "
+            "Automatically enables --track."
+        ),
     )
+
     parser.add_argument(
         "--file",
         action="store_true",
-        help="Rename output MP3 files using their normalized ID3 titles.",
+        help="Rename MP3 files using their normalized ID3 titles.",
     )
+
     parser.add_argument(
-        "--sort_cd",
+        "--sort-cd",
+        dest="sort_cd",
         action="store_true",
-        help="Sort output MP3 files into CD directories and create M3U playlists.",
+        help=("Sort MP3 files into CD directories and create M3U playlists."),
     )
 
     parser.add_argument(
         "--full",
         action="store_true",
-        help="Enable all processing options.",
+        help=(
+            "Enable all processing options: "
+            "--disk, --track, --title, --file and --sort-cd."
+        ),
     )
+
     parser.add_argument(
         "--ipod",
         action="store_true",
-        help="Enable track numbering, title assignment and file renaming.",
+        help=(
+            "Enable iPod-compatible metadata and filenames: "
+            "--track, --title and --file."
+        ),
     )
 
     args = parser.parse_args()
@@ -138,10 +177,6 @@ def main() -> int:
         args.track = True
         args.title = True
         args.file = True
-
-    # --title automatically enables track numbering.
-    if args.title:
-        args.track = True
 
     # --title automatically enables track numbering.
     if args.title:
